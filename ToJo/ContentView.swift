@@ -8,6 +8,8 @@
 import SwiftUI
 import SwiftData
 
+import KeyboardShortcuts
+
 struct ContentView: View {
     @Binding var newEntryTrigger: Bool
     
@@ -53,6 +55,9 @@ struct ContentView: View {
         .onChange(of: newEntryTrigger) { oldValue, newValue in
             createNewEntry()
         }
+        .onGlobalKeyboardShortcut(.showWindow) {_ in 
+            showPinnedEntry()
+        }
     }
     
     private func createNewEntry() {
@@ -76,6 +81,10 @@ struct ContentView: View {
         // Pin this entry
         entry.isPinned = true
     }
+    
+    private func showPinnedEntry() {
+        selectedEntry = allEntries.first(where: { $0.isPinned })
+    }
 }
 
 // MARK: - Entry List View
@@ -89,37 +98,45 @@ struct EntryListView: View {
     @Environment(\.modelContext) private var modelContext
     
     var body: some View {
-        List(selection: $selectedEntry) {
-            // Pinned entry section
-            if let pinnedEntry = entries.first(where: { $0.isPinned }) {
+        ScrollViewReader { proxy in
+    
+            List(selection: $selectedEntry) {
+                // Pinned entry section
+                if let pinnedEntry = entries.first(where: { $0.isPinned }) {
+                    Section {
+                        NavigationLink(value: pinnedEntry) {
+                            EntryRowView(entry: pinnedEntry)
+                        }
+                    } header: {
+                        Label("Pinned", systemImage: "pin.fill")
+                    }
+                }
+                
+                // All entries in chronological order
                 Section {
-                    NavigationLink(value: pinnedEntry) {
-                        EntryRowView(entry: pinnedEntry)
+                    ForEach(unpinnedEntries) { entry in
+                        NavigationLink(value: entry) {
+                            EntryRowView(entry: entry)
+                        }
                     }
+                    .onDelete(perform: deleteEntries)
                 } header: {
-                    Label("Pinned", systemImage: "pin.fill")
+                    Text("Entries")
                 }
             }
-            
-            // All entries in chronological order
-            Section {
-                ForEach(unpinnedEntries) { entry in
-                    NavigationLink(value: entry) {
-                        EntryRowView(entry: entry)
+            .navigationTitle("ToJo")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        onNewEntry()
+                    } label: {
+                        Label("New Entry", systemImage: "plus")
                     }
                 }
-                .onDelete(perform: deleteEntries)
-            } header: {
-                Text("Entries")
             }
-        }
-        .navigationTitle("ToJo")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    onNewEntry()
-                } label: {
-                    Label("New Entry", systemImage: "plus")
+            .onGlobalKeyboardShortcut(.showWindow) {_ in
+                withAnimation{
+                    proxy.scrollTo("top", anchor: .top)
                 }
             }
         }
@@ -149,6 +166,7 @@ struct EntryRowView: View {
                     Image(systemName: "pin.fill")
                         .font(.caption)
                         .foregroundStyle(.blue)
+                        .id("top")
                 }
                 
                 Text(entry.title.isEmpty ? "Untitled" : entry.title)
@@ -423,9 +441,6 @@ extension Color {
 // MARK: - Settings View
 
 struct SettingsView: View {
-    @AppStorage("globalHotkey") private var globalHotkey: String = "⌘⇧T"
-    @State private var isRecordingHotkey = false
-    
     var body: some View {
         Form {
             Section {
@@ -433,19 +448,9 @@ struct SettingsView: View {
                     Text("Global Hotkey to Show Window")
                         .font(.headline)
                     
-                    HStack {
-                        HotkeyRecorderView(
-                            hotkey: $globalHotkey,
-                            isRecording: $isRecordingHotkey
-                        )
-                        
-                        Button(isRecordingHotkey ? "Recording..." : "Record") {
-                            isRecordingHotkey.toggle()
-                        }
-                        .disabled(isRecordingHotkey)
-                    }
+                    KeyboardShortcuts.Recorder(for: .showWindow)
                     
-                    Text("Click Record and press your desired key combination")
+                    Text("Press your desired key combination to set the global hotkey")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -453,12 +458,8 @@ struct SettingsView: View {
                 Text("Keyboard Shortcuts")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Note: Global hotkeys require additional setup and accessibility permissions.")
-                    Text("⌘N always creates a new entry when the app is focused.")
-                    if !globalHotkey.isEmpty {
-                        Text("Current hotkey: \(globalHotkey)")
-                            .fontWeight(.medium)
-                    }
+                    Text("This global hotkey will bring the ToJo window to the front from anywhere.")
+                    Text("⌘N creates a new entry when the app is focused.")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -472,104 +473,10 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 350)
+        .frame(width: 500, height: 300)
     }
 }
 
-// MARK: - Hotkey Recorder View
-
-struct HotkeyRecorderView: NSViewRepresentable {
-    @Binding var hotkey: String
-    @Binding var isRecording: Bool
-    
-    func makeNSView(context: Context) -> NSTextField {
-        let textField = NSTextField()
-        textField.isEditable = false
-        textField.isBordered = true
-        textField.bezelStyle = .roundedBezel
-        textField.placeholderString = "Not set"
-        textField.stringValue = hotkey
-        return textField
-    }
-    
-    func updateNSView(_ nsView: NSTextField, context: Context) {
-        nsView.stringValue = hotkey.isEmpty ? "" : hotkey
-        
-        if isRecording {
-            nsView.becomeFirstResponder()
-            // Start monitoring for key events
-            context.coordinator.startMonitoring(for: nsView)
-        } else {
-            context.coordinator.stopMonitoring()
-        }
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject {
-        var parent: HotkeyRecorderView
-        var monitor: Any?
-        
-        init(_ parent: HotkeyRecorderView) {
-            self.parent = parent
-        }
-        
-        func startMonitoring(for view: NSTextField) {
-            stopMonitoring() // Clear any existing monitor
-            
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self = self else { return event }
-                
-                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                let keyCode = event.keyCode
-                
-                // Build the hotkey string
-                var hotkeyString = ""
-                
-                if modifiers.contains(.control) {
-                    hotkeyString += "⌃"
-                }
-                if modifiers.contains(.option) {
-                    hotkeyString += "⌥"
-                }
-                if modifiers.contains(.shift) {
-                    hotkeyString += "⇧"
-                }
-                if modifiers.contains(.command) {
-                    hotkeyString += "⌘"
-                }
-                
-                // Get the character
-                if let characters = event.charactersIgnoringModifiers?.uppercased() {
-                    hotkeyString += characters
-                }
-                
-                // Only accept if there's at least one modifier
-                if !modifiers.isEmpty && !hotkeyString.isEmpty {
-                    DispatchQueue.main.async {
-                        self.parent.hotkey = hotkeyString
-                        self.parent.isRecording = false
-                    }
-                }
-                
-                return nil // Consume the event
-            }
-        }
-        
-        func stopMonitoring() {
-            if let monitor = monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
-            }
-        }
-        
-        deinit {
-            stopMonitoring()
-        }
-    }
-}
 
 #Preview {
     ContentView(newEntryTrigger: .constant(false))

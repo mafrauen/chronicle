@@ -7,11 +7,21 @@
 
 import SwiftUI
 import SwiftData
+import Observation
+
+import KeyboardShortcuts
+
+extension KeyboardShortcuts.Name {
+    static let showWindow = Self("showWindow", default: .init(.t, modifiers: [.command, .shift]))
+}
 
 @main
 struct ToJoApp: App {
     @AppStorage("globalHotkey") private var globalHotkey: String = "command+shift+t"
     @State private var newEntryTrigger = false
+    
+    @State private var appState = AppState()
+
     
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -30,10 +40,6 @@ struct ToJoApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(newEntryTrigger: $newEntryTrigger)
-                .onAppear {
-                    // Set up global hotkey listener
-                    setupGlobalHotkey()
-                }
         }
         .modelContainer(sharedModelContainer)
         .commands {
@@ -51,9 +57,15 @@ struct ToJoApp: App {
         }
         #endif
     }
-    
-    private func setupGlobalHotkey() {
-        // TODO: Implement global hotkey registration
-        // This would require Carbon or other APIs to register system-wide shortcuts
+}
+
+@MainActor
+@Observable
+final class AppState {
+    init() {
+        KeyboardShortcuts.onKeyDown(for: .showWindow) { [self] in
+            NSApp.activate(ignoringOtherApps: true)
+//            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
     }
 }
