@@ -10,10 +10,12 @@ import SwiftData
 
 @main
 struct ToJoApp: App {
+    @AppStorage("globalHotkey") private var globalHotkey: String = "command+shift+t"
+    @State private var newEntryTrigger = false
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            WeeklyGoal.self,
-            Achievement.self,
+            Entry.self,
             Tag.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -27,8 +29,31 @@ struct ToJoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(newEntryTrigger: $newEntryTrigger)
+                .onAppear {
+                    // Set up global hotkey listener
+                    setupGlobalHotkey()
+                }
         }
         .modelContainer(sharedModelContainer)
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("New Entry") {
+                    newEntryTrigger.toggle()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
+        }
+        
+        #if os(macOS)
+        Settings {
+            SettingsView()
+        }
+        #endif
+    }
+    
+    private func setupGlobalHotkey() {
+        // TODO: Implement global hotkey registration
+        // This would require Carbon or other APIs to register system-wide shortcuts
     }
 }

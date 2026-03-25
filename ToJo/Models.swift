@@ -8,85 +8,55 @@
 import Foundation
 import SwiftData
 
-// MARK: - Weekly Goal
+// MARK: - Entry
 
-/// Represents a week's goals and TODO items as free-form text.
-/// Each week gets a fresh entry, and previous weeks become journal entries.
+/// Represents a journal entry - can be a TODO list, accomplishment, note, or anything else.
+/// One entry can be pinned at a time to serve as the "current" TODO list.
 @Model
-final class WeeklyGoal {
-    /// The start date of the week (typically Monday)
-    var weekStartDate: Date
-    
-    /// Free-form text containing the week's goals and TODOs
-    var goalText: String
-    
-    /// When this goal entry was created
-    var createdAt: Date
-    
-    /// When this goal entry was last modified
-    var lastModifiedAt: Date
-    
-    init(weekStartDate: Date, goalText: String = "") {
-        self.weekStartDate = weekStartDate
-        self.goalText = goalText
-        self.createdAt = Date()
-        self.lastModifiedAt = Date()
-    }
-    
-    /// Returns the start of the week for a given date
-    static func startOfWeek(for date: Date = Date()) -> Date {
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
-        return calendar.date(from: components) ?? date
-    }
-}
-
-// MARK: - Achievement
-
-/// Represents a completed task, accomplishment, or achievement.
-/// These are dated entries that can be tagged for later filtering.
-@Model
-final class Achievement {
-    /// The title or brief description of the achievement
+final class Entry {
+    /// The title of the entry
     var title: String
     
-    /// Optional detailed notes about the achievement
-    var notes: String
+    /// The main content of the entry
+    var content: String
     
-    /// When this achievement occurred or was completed
-    var completedAt: Date
-    
-    /// When this entry was created (may differ from completedAt if added retroactively)
+    /// When this entry was created
     var createdAt: Date
     
-    /// Tags associated with this achievement for filtering
-    @Relationship(deleteRule: .nullify, inverse: \Tag.achievements)
+    /// When this entry was last modified
+    var lastModifiedAt: Date
+    
+    /// Whether this entry is pinned (only one can be pinned at a time)
+    var isPinned: Bool
+    
+    /// Tags associated with this entry
+    @Relationship(deleteRule: .nullify, inverse: \Tag.entries)
     var tags: [Tag]
     
-    init(title: String, notes: String = "", completedAt: Date = Date()) {
+    init(title: String = "", content: String = "", createdAt: Date = Date(), isPinned: Bool = false) {
         self.title = title
-        self.notes = notes
-        self.completedAt = completedAt
-        self.createdAt = Date()
+        self.content = content
+        self.createdAt = createdAt
+        self.lastModifiedAt = Date()
+        self.isPinned = isPinned
         self.tags = []
     }
 }
 
 // MARK: - Tag
 
-/// Represents a tag for categorizing achievements.
-/// Used for filtering during performance reviews or retrospectives.
+/// Represents a tag for categorizing entries.
 @Model
 final class Tag {
-    /// The name of the tag (e.g., "shipped", "bug-fix", "feature")
+    /// The name of the tag
     @Attribute(.unique) var name: String
     
     /// Optional color for visual distinction (stored as hex string)
     var colorHex: String?
     
-    /// Achievements associated with this tag
+    /// Entries associated with this tag
     @Relationship(deleteRule: .nullify)
-    var achievements: [Achievement]
+    var entries: [Entry]
     
     /// When this tag was created
     var createdAt: Date
@@ -95,6 +65,6 @@ final class Tag {
         self.name = name
         self.colorHex = colorHex
         self.createdAt = Date()
-        self.achievements = []
+        self.entries = []
     }
 }

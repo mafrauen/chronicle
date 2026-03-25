@@ -9,402 +9,367 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @Binding var newEntryTrigger: Bool
+    
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
+    
+    @State private var selectedEntry: Entry?
+    @State private var shouldFocusTitle = false
+    
     var body: some View {
         NavigationSplitView {
-            SidebarView()
+            EntryListView(
+                entries: allEntries,
+                selectedEntry: $selectedEntry,
+                onPin: pinEntry,
+                onNewEntry: createNewEntry
+            )
         } detail: {
-            Text("Select a view")
-                .font(.title2)
-                .foregroundStyle(.secondary)
+            if let entry = selectedEntry {
+                EntryDetailView(
+                    entry: entry, 
+                    onPin: {
+                        pinEntry(entry)
+                    },
+                    shouldFocusTitle: $shouldFocusTitle
+                )
+            } else if let firstEntry = allEntries.first {
+                EntryDetailView(
+                    entry: firstEntry, 
+                    onPin: {
+                        pinEntry(firstEntry)
+                    },
+                    shouldFocusTitle: $shouldFocusTitle
+                )
+            } else {
+                ContentUnavailableView(
+                    "No Entries",
+                    systemImage: "book.closed",
+                    description: Text("Create your first entry to get started")
+                )
+            }
         }
+        .onChange(of: newEntryTrigger) { oldValue, newValue in
+            createNewEntry()
+        }
+    }
+    
+    private func createNewEntry() {
+        let newEntry = Entry(title: "New Entry")
+        modelContext.insert(newEntry)
+        selectedEntry = newEntry
+        
+        // Trigger focus on title field
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            shouldFocusTitle = true
+        }
+    }
+    
+    private func pinEntry(_ entry: Entry) {
+        // Unpin all other entries
+        for existingEntry in allEntries {
+            if existingEntry != entry {
+                existingEntry.isPinned = false
+            }
+        }
+        // Pin this entry
+        entry.isPinned = true
     }
 }
 
-// MARK: - Sidebar
+// MARK: - Entry List View
 
-struct SidebarView: View {
+struct EntryListView: View {
+    let entries: [Entry]
+    @Binding var selectedEntry: Entry?
+    let onPin: (Entry) -> Void
+    let onNewEntry: () -> Void
+    
+    @Environment(\.modelContext) private var modelContext
+    
     var body: some View {
-        List {
-            Section("This Week") {
-                NavigationLink {
-                    CurrentWeekView()
-                } label: {
-                    Label("Weekly Goals", systemImage: "list.bullet.clipboard")
+        List(selection: $selectedEntry) {
+            // Pinned entry section
+            if let pinnedEntry = entries.first(where: { $0.isPinned }) {
+                Section {
+                    NavigationLink(value: pinnedEntry) {
+                        EntryRowView(entry: pinnedEntry)
+                    }
+                } header: {
+                    Label("Pinned", systemImage: "pin.fill")
                 }
             }
             
-            Section("Achievements") {
-                NavigationLink {
-                    AchievementsListView()
-                } label: {
-                    Label("All Achievements", systemImage: "star.fill")
+            // All entries in chronological order
+            Section {
+                ForEach(unpinnedEntries) { entry in
+                    NavigationLink(value: entry) {
+                        EntryRowView(entry: entry)
+                    }
                 }
-                
-                NavigationLink {
-                    TagsManagementView()
-                } label: {
-                    Label("Manage Tags", systemImage: "tag.fill")
-                }
-            }
-            
-            Section("Journal") {
-                NavigationLink {
-                    WeeklyGoalsArchiveView()
-                } label: {
-                    Label("Past Weeks", systemImage: "book.fill")
-                }
+                .onDelete(perform: deleteEntries)
+            } header: {
+                Text("Entries")
             }
         }
         .navigationTitle("ToJo")
-#if os(macOS)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 250)
-#endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    onNewEntry()
+                } label: {
+                    Label("New Entry", systemImage: "plus")
+                }
+            }
+        }
+    }
+    
+    private var unpinnedEntries: [Entry] {
+        entries.filter { !$0.isPinned }
+    }
+    
+    private func deleteEntries(offsets: IndexSet) {
+        for index in offsets {
+            let entry = unpinnedEntries[index]
+            modelContext.delete(entry)
+        }
     }
 }
 
-// MARK: - Current Week View
+// MARK: - Entry Row View
 
-struct CurrentWeekView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var weeklyGoals: [WeeklyGoal]
-    
-    @State private var currentWeekGoal: WeeklyGoal?
-    @State private var goalText: String = ""
+struct EntryRowView: View {
+    let entry: Entry
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Week of \(weekStartDate, format: .dateTime.month().day().year())")
-                .font(.title2)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                if entry.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                }
+                
+                Text(entry.title.isEmpty ? "Untitled" : entry.title)
+                    .font(.headline)
+            }
             
-            TextEditor(text: $goalText)
+            if !entry.content.isEmpty {
+                Text(entry.content)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            
+            HStack {
+                Text(entry.createdAt, format: .dateTime.month().day().year())
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                
+                if !entry.tags.isEmpty {
+                    ForEach(entry.tags) { tag in
+                        TagBadge(tag: tag)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Entry Detail View
+
+struct EntryDetailView: View {
+    @Bindable var entry: Entry
+    let onPin: () -> Void
+    @Binding var shouldFocusTitle: Bool
+    
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Tag.name) private var allTags: [Tag]
+    
+    @State private var showingTagPicker = false
+    @FocusState private var isTitleFocused: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Title field
+            TextField("Entry Title", text: $entry.title)
+                .font(.title2)
+                .textFieldStyle(.plain)
+                .focused($isTitleFocused)
+                .padding()
+                .background(Color(nsColor: .controlBackgroundColor))
+            
+            Divider()
+            
+            // Content editor
+            TextEditor(text: $entry.content)
                 .font(.body)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onChange(of: goalText) { oldValue, newValue in
-                    saveGoalText()
+                .padding(.horizontal)
+                .onChange(of: entry.content) { oldValue, newValue in
+                    entry.lastModifiedAt = Date()
                 }
-        }
-        .padding()
-        .navigationTitle("Weekly Goals")
-        .onAppear {
-            loadCurrentWeekGoal()
-        }
-    }
-    
-    private var weekStartDate: Date {
-        WeeklyGoal.startOfWeek()
-    }
-    
-    private func loadCurrentWeekGoal() {
-        let startDate = weekStartDate
-        
-        // Find existing goal for this week
-        if let existing = weeklyGoals.first(where: { Calendar.current.isDate($0.weekStartDate, equalTo: startDate, toGranularity: .day) }) {
-            currentWeekGoal = existing
-            goalText = existing.goalText
-        } else {
-            // Create new goal for this week
-            let newGoal = WeeklyGoal(weekStartDate: startDate)
-            modelContext.insert(newGoal)
-            currentWeekGoal = newGoal
-            goalText = ""
-        }
-    }
-    
-    private func saveGoalText() {
-        guard let goal = currentWeekGoal else { return }
-        goal.goalText = goalText
-        goal.lastModifiedAt = Date()
-    }
-}
-
-// MARK: - Achievements List View
-
-struct AchievementsListView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Achievement.completedAt, order: .reverse) private var achievements: [Achievement]
-    
-    @State private var showingAddAchievement = false
-    
-    var body: some View {
-        List {
-            ForEach(achievements) { achievement in
-                NavigationLink {
-                    AchievementDetailView(achievement: achievement)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(achievement.title)
-                            .font(.headline)
-                        
-                        HStack {
-                            Text(achievement.completedAt, format: .dateTime.month().day().year())
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            
-                            if !achievement.tags.isEmpty {
-                                ForEach(achievement.tags) { tag in
+                .onChange(of: entry.title) { oldValue, newValue in
+                    entry.lastModifiedAt = Date()
+                }
+            
+            Divider()
+            
+            // Tags and metadata
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    if !entry.tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack {
+                                ForEach(entry.tags) { tag in
                                     TagBadge(tag: tag)
+                                        .overlay(alignment: .topTrailing) {
+                                            Button {
+                                                removeTag(tag)
+                                            } label: {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .offset(x: 4, y: -4)
+                                        }
                                 }
                             }
                         }
                     }
-                    .padding(.vertical, 4)
-                }
-            }
-            .onDelete(perform: deleteAchievements)
-        }
-        .navigationTitle("Achievements")
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    showingAddAchievement = true
-                } label: {
-                    Label("Add Achievement", systemImage: "plus")
-                }
-            }
-        }
-        .sheet(isPresented: $showingAddAchievement) {
-            AddAchievementView()
-        }
-    }
-    
-    private func deleteAchievements(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(achievements[index])
-        }
-    }
-}
-
-// MARK: - Achievement Detail View
-
-struct AchievementDetailView: View {
-    @Bindable var achievement: Achievement
-    
-    var body: some View {
-        Form {
-            Section("Details") {
-                TextField("Title", text: $achievement.title)
-                DatePicker("Completed", selection: $achievement.completedAt, displayedComponents: .date)
-            }
-            
-            Section("Notes") {
-                TextEditor(text: $achievement.notes)
-                    .frame(minHeight: 100)
-            }
-            
-            Section("Tags") {
-                // TODO: Tag selection UI
-                ForEach(achievement.tags) { tag in
-                    Text(tag.name)
-                }
-            }
-        }
-        .navigationTitle("Achievement")
-    }
-}
-
-// MARK: - Add Achievement View
-
-struct AddAchievementView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var title: String = ""
-    @State private var notes: String = ""
-    @State private var completedAt: Date = Date()
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Title", text: $title)
-                DatePicker("Completed", selection: $completedAt, displayedComponents: .date)
-                
-                Section("Notes") {
-                    TextEditor(text: $notes)
-                        .frame(minHeight: 100)
-                }
-            }
-            .navigationTitle("New Achievement")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
+                    
+                    Button {
+                        showingTagPicker = true
+                    } label: {
+                        Label("Add Tag", systemImage: "tag")
+                            .font(.caption)
                     }
+                    .buttonStyle(.borderless)
                 }
                 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        addAchievement()
-                    }
-                    .disabled(title.isEmpty)
-                }
-            }
-        }
-    }
-    
-    private func addAchievement() {
-        let achievement = Achievement(title: title, notes: notes, completedAt: completedAt)
-        modelContext.insert(achievement)
-        dismiss()
-    }
-}
-
-// MARK: - Tags Management View
-
-struct TagsManagementView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Tag.name) private var tags: [Tag]
-    
-    @State private var showingAddTag = false
-    
-    var body: some View {
-        List {
-            ForEach(tags) { tag in
                 HStack {
-                    TagBadge(tag: tag)
+                    Text("Created: \(entry.createdAt, format: .dateTime.month().day().year())")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
                     Spacer()
-                    Text("\(tag.achievements.count) achievements")
-                        .font(.caption)
+                    
+                    Text("Modified: \(entry.lastModifiedAt, format: .relative(presentation: .named))")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
-            .onDelete(perform: deleteTags)
+            .padding()
+            .background(Color(nsColor: .controlBackgroundColor))
         }
-        .navigationTitle("Tags")
         .toolbar {
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showingAddTag = true
+                    onPin()
                 } label: {
-                    Label("Add Tag", systemImage: "plus")
+                    Label(entry.isPinned ? "Pinned" : "Pin", systemImage: entry.isPinned ? "pin.fill" : "pin")
                 }
             }
         }
-        .sheet(isPresented: $showingAddTag) {
-            AddTagView()
+        .sheet(isPresented: $showingTagPicker) {
+            TagPickerView(entry: entry, allTags: allTags)
+        }
+        .onChange(of: shouldFocusTitle) { oldValue, newValue in
+            if newValue {
+                isTitleFocused = true
+                shouldFocusTitle = false
+            }
         }
     }
     
-    private func deleteTags(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(tags[index])
+    private func removeTag(_ tag: Tag) {
+        if let index = entry.tags.firstIndex(of: tag) {
+            entry.tags.remove(at: index)
         }
     }
 }
 
-// MARK: - Add Tag View
+// MARK: - Tag Picker View
 
-struct AddTagView: View {
-    @Environment(\.modelContext) private var modelContext
+struct TagPickerView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
-    @State private var tagName: String = ""
+    let entry: Entry
+    let allTags: [Tag]
+    
+    @State private var newTagName: String = ""
     
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Tag Name", text: $tagName)
-//                    .textInputAutocapitalization(.never)
-            }
-            .navigationTitle("New Tag")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
+            List {
+                if !availableTags.isEmpty {
+                    Section {
+                        ForEach(availableTags) { tag in
+                            Button {
+                                addTag(tag)
+                            } label: {
+                                HStack {
+                                    TagBadge(tag: tag)
+                                    Spacer()
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Available Tags")
                     }
                 }
                 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        addTag()
+                Section {
+                    HStack {
+                        TextField("New tag name", text: $newTagName)
+                        Button("Create") {
+                            createAndAddTag()
+                        }
+                        .disabled(newTagName.isEmpty)
                     }
-                    .disabled(tagName.isEmpty)
+                } header: {
+                    Text("Create New Tag")
+                }
+            }
+            .navigationTitle("Add Tags")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
                 }
             }
         }
+        .frame(minWidth: 400, minHeight: 300)
     }
     
-    private func addTag() {
-        let tag = Tag(name: tagName)
-        modelContext.insert(tag)
+    private var availableTags: [Tag] {
+        allTags.filter { tag in
+            !entry.tags.contains(tag)
+        }
+    }
+    
+    private func addTag(_ tag: Tag) {
+        if !entry.tags.contains(tag) {
+            entry.tags.append(tag)
+        }
+        dismiss()
+    }
+    
+    private func createAndAddTag() {
+        let newTag = Tag(name: newTagName)
+        modelContext.insert(newTag)
+        entry.tags.append(newTag)
+        newTagName = ""
         dismiss()
     }
 }
 
-// MARK: - Weekly Goals Archive View
-
-struct WeeklyGoalsArchiveView: View {
-    @Environment(\.dateService) private var dateService
-    @Query(sort: \WeeklyGoal.weekStartDate, order: .reverse) private var allWeeklyGoals: [WeeklyGoal]
-    
-    var body: some View {
-        List {
-            ForEach(pastWeekGoals) { goal in
-                NavigationLink {
-                    WeeklyGoalDetailView(goal: goal)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Week of \(goal.weekStartDate, format: .dateTime.month().day().year())")
-                            .font(.headline)
-                        
-                        if !goal.goalText.isEmpty {
-                            Text(goal.goalText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        } else {
-                            Text("No goals recorded")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .italic()
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-        }
-        .navigationTitle("Past Weeks")
-    }
-    
-    /// Filter out the current week's goals
-    private var pastWeekGoals: [WeeklyGoal] {
-        let currentWeekStart = WeeklyGoal.startOfWeek(for: dateService.now)
-        return allWeeklyGoals.filter { goal in
-            !Calendar.current.isDate(goal.weekStartDate, equalTo: currentWeekStart, toGranularity: .day)
-        }
-    }
-}
-
-// MARK: - Weekly Goal Detail View
-
-struct WeeklyGoalDetailView: View {
-    let goal: WeeklyGoal
-    
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Week of \(goal.weekStartDate, format: .dateTime.month().day().year())")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                
-                if goal.goalText.isEmpty {
-                    Text("No goals recorded for this week")
-                        .foregroundStyle(.tertiary)
-                        .italic()
-                } else {
-                    Text(goal.goalText)
-                }
-                
-                Spacer()
-            }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .navigationTitle("Weekly Goal")
-    }
-}
-
-// MARK: - Helper Views
+// MARK: - Tag Badge
 
 struct TagBadge: View {
     let tag: Tag
@@ -455,8 +420,158 @@ extension Color {
     }
 }
 
-#Preview {
-    ContentView()
-        .modelContainer(for: [WeeklyGoal.self, Achievement.self, Tag.self], inMemory: true)
+// MARK: - Settings View
+
+struct SettingsView: View {
+    @AppStorage("globalHotkey") private var globalHotkey: String = "⌘⇧T"
+    @State private var isRecordingHotkey = false
+    
+    var body: some View {
+        Form {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Global Hotkey to Show Window")
+                        .font(.headline)
+                    
+                    HStack {
+                        HotkeyRecorderView(
+                            hotkey: $globalHotkey,
+                            isRecording: $isRecordingHotkey
+                        )
+                        
+                        Button(isRecordingHotkey ? "Recording..." : "Record") {
+                            isRecordingHotkey.toggle()
+                        }
+                        .disabled(isRecordingHotkey)
+                    }
+                    
+                    Text("Click Record and press your desired key combination")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Keyboard Shortcuts")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Note: Global hotkeys require additional setup and accessibility permissions.")
+                    Text("⌘N always creates a new entry when the app is focused.")
+                    if !globalHotkey.isEmpty {
+                        Text("Current hotkey: \(globalHotkey)")
+                            .fontWeight(.medium)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            
+            Section {
+                LabeledContent("App Version", value: "1.0.0")
+                LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
+            } header: {
+                Text("About")
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 500, height: 350)
+    }
 }
 
+// MARK: - Hotkey Recorder View
+
+struct HotkeyRecorderView: NSViewRepresentable {
+    @Binding var hotkey: String
+    @Binding var isRecording: Bool
+    
+    func makeNSView(context: Context) -> NSTextField {
+        let textField = NSTextField()
+        textField.isEditable = false
+        textField.isBordered = true
+        textField.bezelStyle = .roundedBezel
+        textField.placeholderString = "Not set"
+        textField.stringValue = hotkey
+        return textField
+    }
+    
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        nsView.stringValue = hotkey.isEmpty ? "" : hotkey
+        
+        if isRecording {
+            nsView.becomeFirstResponder()
+            // Start monitoring for key events
+            context.coordinator.startMonitoring(for: nsView)
+        } else {
+            context.coordinator.stopMonitoring()
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject {
+        var parent: HotkeyRecorderView
+        var monitor: Any?
+        
+        init(_ parent: HotkeyRecorderView) {
+            self.parent = parent
+        }
+        
+        func startMonitoring(for view: NSTextField) {
+            stopMonitoring() // Clear any existing monitor
+            
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self = self else { return event }
+                
+                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                let keyCode = event.keyCode
+                
+                // Build the hotkey string
+                var hotkeyString = ""
+                
+                if modifiers.contains(.control) {
+                    hotkeyString += "⌃"
+                }
+                if modifiers.contains(.option) {
+                    hotkeyString += "⌥"
+                }
+                if modifiers.contains(.shift) {
+                    hotkeyString += "⇧"
+                }
+                if modifiers.contains(.command) {
+                    hotkeyString += "⌘"
+                }
+                
+                // Get the character
+                if let characters = event.charactersIgnoringModifiers?.uppercased() {
+                    hotkeyString += characters
+                }
+                
+                // Only accept if there's at least one modifier
+                if !modifiers.isEmpty && !hotkeyString.isEmpty {
+                    DispatchQueue.main.async {
+                        self.parent.hotkey = hotkeyString
+                        self.parent.isRecording = false
+                    }
+                }
+                
+                return nil // Consume the event
+            }
+        }
+        
+        func stopMonitoring() {
+            if let monitor = monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+        
+        deinit {
+            stopMonitoring()
+        }
+    }
+}
+
+#Preview {
+    ContentView(newEntryTrigger: .constant(false))
+        .modelContainer(for: [Entry.self, Tag.self], inMemory: true)
+}
