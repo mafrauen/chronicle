@@ -331,7 +331,7 @@ struct EntryDetailView: View {
                 }
                 
                 HStack {
-                    Text("Created: \(entry.createdAt, format: .dateTime.month().day().year())")
+                    Text("Created: \(entry.createdAt, format: .dateTime.month().day().year().hour().minute())")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     
@@ -446,6 +446,8 @@ struct TagPickerView: View {
                         } else {
                             addTag(tag)
                         }
+                    } onDelete: {
+                        deleteTag(tag)
                     }
                 }
                 
@@ -513,6 +515,14 @@ struct TagPickerView: View {
         searchText = ""
     }
     
+    private func deleteTag(_ tag: Tag) {
+        // Remove from this entry first
+        if let index = entry.tags.firstIndex(of: tag) {
+            entry.tags.remove(at: index)
+        }
+        modelContext.delete(tag)
+    }
+    
     /// Fuzzy match: checks if all characters of the query appear in order within the target string.
     private func fuzzyMatch(query: String, in target: String) -> Bool {
         var queryIndex = query.lowercased().startIndex
@@ -534,13 +544,15 @@ struct TagPickerRow: View {
     @Bindable var tag: Tag
     let isAdded: Bool
     let onToggle: () -> Void
+    let onDelete: () -> Void
     
     @State private var tagColor: Color
     
-    init(tag: Tag, isAdded: Bool, onToggle: @escaping () -> Void) {
+    init(tag: Tag, isAdded: Bool, onToggle: @escaping () -> Void, onDelete: @escaping () -> Void) {
         self.tag = tag
         self.isAdded = isAdded
         self.onToggle = onToggle
+        self.onDelete = onDelete
         if let hex = tag.colorHex, let color = Color(hex: hex) {
             self._tagColor = State(initialValue: color)
         } else {
@@ -556,6 +568,7 @@ struct TagPickerRow: View {
                 if isAdded {
                     Image(systemName: "checkmark")
                         .foregroundStyle(.blue)
+                        .padding(.trailing, 4)
                 }
             }
             .contentShape(Rectangle())
@@ -569,6 +582,16 @@ struct TagPickerRow: View {
                 .onChange(of: tagColor) { _, newColor in
                     tag.colorHex = newColor.hexString
                 }
+            
+            Button {
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 4)
+            }
+            .buttonStyle(.plain)
         }
     }
 }
