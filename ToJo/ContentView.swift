@@ -307,6 +307,20 @@ struct EntryDetailView: View {
             // Tags and metadata
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
+                    Button {
+                        showingTagPicker = true
+                    } label: {
+                        Image(systemName: "tag")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Browse all tags")
+                    .popover(isPresented: $showingTagPicker, arrowEdge: .top) {
+                        TagPickerView(entry: entry, allTags: allTags)
+                    }
+                    
+                    inlineTagInput
+                    
                     if !entry.tags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
@@ -318,17 +332,6 @@ struct EntryDetailView: View {
                             }
                         }
                     }
-                    
-                    inlineTagInput
-                    
-                    Button {
-                        showingTagPicker = true
-                    } label: {
-                        Image(systemName: "tag")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Browse all tags")
                 }
                 
                 HStack {
@@ -355,9 +358,6 @@ struct EntryDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingTagPicker) {
-            TagPickerView(entry: entry, allTags: allTags)
-        }
         .onChange(of: shouldFocusTitle) { oldValue, newValue in
             if newValue {
                 isTitleFocused = true
@@ -376,7 +376,11 @@ struct EntryDetailView: View {
         TextField("Add tag…", text: $inlineTagName)
             .textFieldStyle(.plain)
             .font(.caption)
-            .frame(width: 80)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .frame(width: 90)
             .focused($isTagFieldFocused)
             .onSubmit {
                 addInlineTag()
@@ -419,31 +423,38 @@ struct TagPickerView: View {
     @State private var newTagName: String = ""
     
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Tags")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            
+            Divider()
+            
             List {
                 if !allTags.isEmpty {
                     Section {
                         ForEach(allTags) { tag in
-                            let isAdded = entry.tags.contains(tag)
-                            Button {
-                                if isAdded {
+                            TagPickerRow(tag: tag, isAdded: entry.tags.contains(tag)) {
+                                if entry.tags.contains(tag) {
                                     removeTag(tag)
                                 } else {
                                     addTag(tag)
                                 }
-                            } label: {
-                                HStack {
-                                    TagBadge(tag: tag)
-                                    Spacer()
-                                    if isAdded {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(.blue)
-                                    }
-                                }
                             }
                         }
                     } header: {
-                        Text("Tags")
+                        Text("Available Tags")
                     }
                 }
                 
@@ -462,16 +473,8 @@ struct TagPickerView: View {
                     Text("Create New Tag")
                 }
             }
-            .navigationTitle("Add Tags")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
-        .frame(minWidth: 400, minHeight: 300)
+        .frame(width: 350, height: 400)
     }
     
     private func removeTag(_ tag: Tag) {
@@ -493,6 +496,52 @@ struct TagPickerView: View {
         modelContext.insert(newTag)
         entry.tags.append(newTag)
         newTagName = ""
+    }
+}
+
+// MARK: - Tag Picker Row
+
+struct TagPickerRow: View {
+    @Bindable var tag: Tag
+    let isAdded: Bool
+    let onToggle: () -> Void
+    
+    @State private var tagColor: Color
+    
+    init(tag: Tag, isAdded: Bool, onToggle: @escaping () -> Void) {
+        self.tag = tag
+        self.isAdded = isAdded
+        self.onToggle = onToggle
+        if let hex = tag.colorHex, let color = Color(hex: hex) {
+            self._tagColor = State(initialValue: color)
+        } else {
+            self._tagColor = State(initialValue: .blue)
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            Button {
+                onToggle()
+            } label: {
+                HStack {
+                    TagBadge(tag: tag)
+                    Spacer()
+                    if isAdded {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(.blue)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            
+            ColorPicker("", selection: $tagColor, supportsOpacity: false)
+                .labelsHidden()
+                .frame(width: 24)
+                .onChange(of: tagColor) { _, newColor in
+                    tag.colorHex = newColor.hexString
+                }
+        }
     }
 }
 
@@ -579,6 +628,14 @@ extension Color {
             blue:  Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+    
+    var hexString: String? {
+        guard let components = NSColor(self).usingColorSpace(.sRGB) else { return nil }
+        let r = Int(components.redComponent * 255)
+        let g = Int(components.greenComponent * 255)
+        let b = Int(components.blueComponent * 255)
+        return String(format: "%02X%02X%02X", r, g, b)
     }
 }
 
