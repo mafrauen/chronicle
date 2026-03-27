@@ -116,6 +116,25 @@ struct ContentView: View {
 
 // MARK: - Entry List View
 
+enum DateFilter: String, CaseIterable, Identifiable {
+    case all = "All Time"
+    case last7Days = "Last 7 Days"
+    case last30Days = "Last 30 Days"
+    case last6Months = "Last 6 Months"
+    
+    var id: String { rawValue }
+    
+    var date: Date? {
+        let calendar = Calendar.current
+        switch self {
+        case .all: return nil
+        case .last7Days: return calendar.date(byAdding: .day, value: -7, to: .now)
+        case .last30Days: return calendar.date(byAdding: .day, value: -30, to: .now)
+        case .last6Months: return calendar.date(byAdding: .month, value: -6, to: .now)
+        }
+    }
+}
+
 struct EntryListView: View {
     let entries: [Entry]
     @Binding var selectedEntry: Entry?
@@ -124,15 +143,70 @@ struct EntryListView: View {
     let onDelete: (Entry) -> Void
     
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Tag.name) private var allTags: [Tag]
     
     @State private var entryToDelete: Entry?
+    @State private var searchText: String = ""
+    @State private var selectedTags: Set<PersistentIdentifier> = []
+    @State private var dateFilter: DateFilter = .all
+    @State private var showFilters = false
     
     var body: some View {
         ScrollViewReader { proxy in
     
             List(selection: $selectedEntry) {
-                // Pinned entry section
-                if let pinnedEntry = entries.first(where: { $0.isPinned }) {
+                // Filter controls
+                if showFilters {
+                    Section {
+                        // Date filter
+                        Picker("Date", selection: $dateFilter) {
+                            ForEach(DateFilter.allCases) { filter in
+                                Text(filter.rawValue).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        
+                        // Tag filter
+                        if !allTags.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Tags")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                FlowLayout(spacing: 4) {
+                                    ForEach(allTags) { tag in
+                                        let isSelected = selectedTags.contains(tag.persistentModelID)
+                                        TagBadge(tag: tag)
+                                            .opacity(isSelected ? 1.0 : 0.5)
+                                            .overlay(
+                                                Capsule()
+                                                    .strokeBorder(isSelected ? Color.blue : Color.clear, lineWidth: 1.5)
+                                            )
+                                            .onTapGesture {
+                                                if isSelected {
+                                                    selectedTags.remove(tag.persistentModelID)
+                                                } else {
+                                                    selectedTags.insert(tag.persistentModelID)
+                                                }
+                                            }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if !selectedTags.isEmpty || dateFilter != .all {
+                            Button("Clear Filters") {
+                                selectedTags.removeAll()
+                                dateFilter = .all
+                            }
+                            .font(.caption)
+                        }
+                    } header: {
+                        Text("Filters")
+                    }
+                }
+                
+                // Pinned entry section (hidden when filtering)
+                if !isFiltering, let pinnedEntry = entries.first(where: { $0.isPinned }) {
                     Section {
                         NavigationLink(value: pinnedEntry) {
                             EntryRowView(entry: pinnedEntry)
@@ -145,9 +219,9 @@ struct EntryListView: View {
                     }
                 }
                 
-                // All entries in chronological order
+                // Filtered entries
                 Section {
-                    ForEach(unpinnedEntries) { entry in
+                    ForEach(filteredUnpinnedEntries) { entry in
                         NavigationLink(value: entry) {
                             EntryRowView(entry: entry)
                         }
@@ -160,6 +234,7 @@ struct EntryListView: View {
                     Text("Entries")
                 }
             }
+            .searchable(text: $searchText, prompt: "Filter entries")
             .navigationTitle("ToJo")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -168,6 +243,16 @@ struct EntryListView: View {
                     } label: {
                         Label("New Entry", systemImage: "plus")
                     }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        withAnimation {
+                            showFilters.toggle()
+                        }
+                    } label: {
+                        Label("Filters", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    }
+                    .help("Toggle filters")
                 }
             }
             .onGlobalKeyboardShortcut(.showWindow) {_ in
@@ -209,13 +294,47 @@ struct EntryListView: View {
         }
     }
     
+    private var isFiltering: Bool {
+        !searchText.trimmingCharacters(in: .whitespaces).isEmpty ||
+        !selectedTags.isEmpty ||
+        dateFilter != .all
+    }
+    
     private var unpinnedEntries: [Entry] {
         entries.filter { !$0.isPinned }
     }
     
+    private var filteredUnpinnedEntries: [Entry] {
+        var result = unpinnedEntries
+        
+        // Text search
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            result = result.filter { entry in
+                entry.title.localizedCaseInsensitiveContains(query) ||
+                entry.content.localizedCaseInsensitiveContains(query) ||
+                entry.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
+            }
+        }
+        
+        // Tag filter (OR: entry must have at least one of the selected tags)
+        if !selectedTags.isEmpty {
+            result = result.filter { entry in
+                entry.tags.contains { selectedTags.contains($0.persistentModelID) }
+            }
+        }
+        
+        // Date filter
+        if let cutoff = dateFilter.date {
+            result = result.filter { $0.createdAt >= cutoff }
+        }
+        
+        return result
+    }
+    
     private func deleteEntries(offsets: IndexSet) {
         for index in offsets {
-            entryToDelete = unpinnedEntries[index]
+            entryToDelete = filteredUnpinnedEntries[index]
         }
     }
 }
@@ -372,6 +491,48 @@ struct EntryDetailView: View {
         if let index = entry.tags.firstIndex(of: tag) {
             entry.tags.remove(at: index)
         }
+    }
+}
+
+// MARK: - Flow Layout
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = layout(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = layout(proposal: proposal, subviews: subviews)
+        for (index, position) in result.positions.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y), proposal: .unspecified)
+        }
+    }
+    
+    private func layout(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint]) {
+        let maxWidth = proposal.width ?? .infinity
+        var positions: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            positions.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            totalHeight = y + rowHeight
+        }
+        
+        return (CGSize(width: maxWidth, height: totalHeight), positions)
     }
 }
 
