@@ -274,9 +274,7 @@ struct EntryDetailView: View {
     @Query(sort: \Tag.name) private var allTags: [Tag]
     
     @State private var showingTagPicker = false
-    @State private var inlineTagName: String = ""
     @FocusState private var isTitleFocused: Bool
-    @FocusState private var isTagFieldFocused: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -318,8 +316,6 @@ struct EntryDetailView: View {
                     .popover(isPresented: $showingTagPicker, arrowEdge: .top) {
                         TagPickerView(entry: entry, allTags: allTags)
                     }
-                    
-                    inlineTagInput
                     
                     if !entry.tags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -366,42 +362,10 @@ struct EntryDetailView: View {
         }
         .onChange(of: shouldFocusTagField) { oldValue, newValue in
             if newValue {
-                isTagFieldFocused = true
+                showingTagPicker = true
                 shouldFocusTagField = false
             }
         }
-    }
-    
-    private var inlineTagInput: some View {
-        TextField("Add tag…", text: $inlineTagName)
-            .textFieldStyle(.plain)
-            .font(.caption)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .frame(width: 90)
-            .focused($isTagFieldFocused)
-            .onSubmit {
-                addInlineTag()
-            }
-    }
-    
-    private func addInlineTag() {
-        let name = inlineTagName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        
-        // Find existing tag or create new one
-        if let existing = allTags.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
-            if !entry.tags.contains(existing) {
-                entry.tags.append(existing)
-            }
-        } else {
-            let newTag = Tag(name: name)
-            modelContext.insert(newTag)
-            entry.tags.append(newTag)
-        }
-        inlineTagName = ""
     }
     
     private func removeTag(_ tag: Tag) {
@@ -420,61 +384,112 @@ struct TagPickerView: View {
     let entry: Entry
     let allTags: [Tag]
     
-    @State private var newTagName: String = ""
+    @State private var searchText: String = ""
+    @FocusState private var isSearchFocused: Bool
+    
+    private var filteredTags: [Tag] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if query.isEmpty { return allTags }
+        return allTags.filter { fuzzyMatch(query: query, in: $0.name) }
+    }
+    
+    private var exactMatchExists: Bool {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        return allTags.contains { $0.name.caseInsensitiveCompare(query) == .orderedSame }
+    }
+    
+    private var queryIsEmpty: Bool {
+        searchText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Search field
             HStack {
-                Text("Tags")
-                    .font(.headline)
-                Spacer()
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search or create tags…", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .focused($isSearchFocused)
+                    .onSubmit {
+                        handleSubmit()
+                    }
+                
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
                 Button {
                     dismiss()
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                    Text("Done")
+                        .font(.caption)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
             }
-            .padding()
+            .padding(10)
             
             Divider()
             
+            // Tag list
             List {
-                if !allTags.isEmpty {
-                    Section {
-                        ForEach(allTags) { tag in
-                            TagPickerRow(tag: tag, isAdded: entry.tags.contains(tag)) {
-                                if entry.tags.contains(tag) {
-                                    removeTag(tag)
-                                } else {
-                                    addTag(tag)
-                                }
-                            }
+                ForEach(filteredTags) { tag in
+                    TagPickerRow(tag: tag, isAdded: entry.tags.contains(tag)) {
+                        if entry.tags.contains(tag) {
+                            removeTag(tag)
+                        } else {
+                            addTag(tag)
                         }
-                    } header: {
-                        Text("Available Tags")
                     }
                 }
                 
-                Section {
-                    HStack {
-                        TextField("New tag name", text: $newTagName)
-                            .onSubmit {
-                                createAndAddTag()
-                            }
-                        Button("Create") {
-                            createAndAddTag()
+                // "Create" row when search text doesn't match an existing tag
+                if !queryIsEmpty && !exactMatchExists {
+                    Button {
+                        createAndAddTag()
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("Create \"\(searchText.trimmingCharacters(in: .whitespaces))\"")
+                            Spacer()
                         }
-                        .disabled(newTagName.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                } header: {
-                    Text("Create New Tag")
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .frame(width: 350, height: 400)
+        .frame(width: 320, height: 350)
+        .onAppear {
+            isSearchFocused = true
+        }
+    }
+    
+    private func handleSubmit() {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return }
+        
+        // If there's an exact match, toggle it
+        if let exact = allTags.first(where: { $0.name.caseInsensitiveCompare(query) == .orderedSame }) {
+            if !entry.tags.contains(exact) {
+                addTag(exact)
+            }
+        } else if let first = filteredTags.first {
+            // Add the top filtered result
+            if !entry.tags.contains(first) {
+                addTag(first)
+            }
+        } else {
+            // No matches — create a new tag
+            createAndAddTag()
+        }
+        searchText = ""
     }
     
     private func removeTag(_ tag: Tag) {
@@ -490,12 +505,26 @@ struct TagPickerView: View {
     }
     
     private func createAndAddTag() {
-        let name = newTagName.trimmingCharacters(in: .whitespaces)
+        let name = searchText.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
         let newTag = Tag(name: name)
         modelContext.insert(newTag)
         entry.tags.append(newTag)
-        newTagName = ""
+        searchText = ""
+    }
+    
+    /// Fuzzy match: checks if all characters of the query appear in order within the target string.
+    private func fuzzyMatch(query: String, in target: String) -> Bool {
+        var queryIndex = query.lowercased().startIndex
+        let queryLower = query.lowercased()
+        let targetLower = target.lowercased()
+        
+        for char in targetLower {
+            if queryIndex < queryLower.endIndex && char == queryLower[queryIndex] {
+                queryIndex = queryLower.index(after: queryIndex)
+            }
+        }
+        return queryIndex == queryLower.endIndex
     }
 }
 
@@ -521,19 +550,18 @@ struct TagPickerRow: View {
     
     var body: some View {
         HStack {
-            Button {
-                onToggle()
-            } label: {
-                HStack {
-                    TagBadge(tag: tag)
-                    Spacer()
-                    if isAdded {
-                        Image(systemName: "checkmark")
-                            .foregroundStyle(.blue)
-                    }
+            HStack {
+                TagBadge(tag: tag)
+                Spacer()
+                if isAdded {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.blue)
                 }
             }
-            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onToggle()
+            }
             
             ColorPicker("", selection: $tagColor, supportsOpacity: false)
                 .labelsHidden()
