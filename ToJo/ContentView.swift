@@ -12,6 +12,7 @@ import KeyboardShortcuts
 
 struct ContentView: View {
     @Binding var newEntryTrigger: Bool
+    @Binding var showPinnedPane: Bool
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
@@ -19,37 +20,49 @@ struct ContentView: View {
     @State private var selectedEntry: Entry?
     @State private var shouldFocusTitle = false
     
+    private var pinnedEntry: Entry? {
+        allEntries.first(where: { $0.isPinned })
+    }
+    
     var body: some View {
-        NavigationSplitView {
-            EntryListView(
-                entries: allEntries,
-                selectedEntry: $selectedEntry,
-                onPin: pinEntry,
-                onNewEntry: createNewEntry
-            )
-        } detail: {
-            if let entry = selectedEntry {
-                EntryDetailView(
-                    entry: entry, 
-                    onPin: {
-                        pinEntry(entry)
-                    },
-                    shouldFocusTitle: $shouldFocusTitle
+        HSplitView {
+            NavigationSplitView {
+                EntryListView(
+                    entries: allEntries,
+                    selectedEntry: $selectedEntry,
+                    onPin: pinEntry,
+                    onNewEntry: createNewEntry,
+                    onDelete: deleteEntry
                 )
-            } else if let firstEntry = allEntries.first {
-                EntryDetailView(
-                    entry: firstEntry, 
-                    onPin: {
-                        pinEntry(firstEntry)
-                    },
-                    shouldFocusTitle: $shouldFocusTitle
-                )
-            } else {
-                ContentUnavailableView(
-                    "No Entries",
-                    systemImage: "book.closed",
-                    description: Text("Create your first entry to get started")
-                )
+            } detail: {
+                if let entry = selectedEntry {
+                    EntryDetailView(
+                        entry: entry, 
+                        onPin: {
+                            pinEntry(entry)
+                        },
+                        shouldFocusTitle: $shouldFocusTitle
+                    )
+                } else if let firstEntry = allEntries.first {
+                    EntryDetailView(
+                        entry: firstEntry, 
+                        onPin: {
+                            pinEntry(firstEntry)
+                        },
+                        shouldFocusTitle: $shouldFocusTitle
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "No Entries",
+                        systemImage: "book.closed",
+                        description: Text("Create your first entry to get started")
+                    )
+                }
+            }
+            
+            if showPinnedPane, let pinned = pinnedEntry {
+                PinnedPaneView(entry: pinned)
+                    .frame(minWidth: 250, idealWidth: 300)
             }
         }
         .onChange(of: newEntryTrigger) { oldValue, newValue in
@@ -82,6 +95,13 @@ struct ContentView: View {
         entry.isPinned = true
     }
     
+    private func deleteEntry(_ entry: Entry) {
+        if selectedEntry == entry {
+            selectedEntry = nil
+        }
+        modelContext.delete(entry)
+    }
+    
     private func showPinnedEntry() {
         selectedEntry = allEntries.first(where: { $0.isPinned })
     }
@@ -94,8 +114,11 @@ struct EntryListView: View {
     @Binding var selectedEntry: Entry?
     let onPin: (Entry) -> Void
     let onNewEntry: () -> Void
+    let onDelete: (Entry) -> Void
     
     @Environment(\.modelContext) private var modelContext
+    
+    @State private var entryToDelete: Entry?
     
     var body: some View {
         ScrollViewReader { proxy in
@@ -107,6 +130,9 @@ struct EntryListView: View {
                         NavigationLink(value: pinnedEntry) {
                             EntryRowView(entry: pinnedEntry)
                         }
+                        .contextMenu {
+                            entryContextMenu(for: pinnedEntry)
+                        }
                     } header: {
                         Label("Pinned", systemImage: "pin.fill")
                     }
@@ -117,6 +143,9 @@ struct EntryListView: View {
                     ForEach(unpinnedEntries) { entry in
                         NavigationLink(value: entry) {
                             EntryRowView(entry: entry)
+                        }
+                        .contextMenu {
+                            entryContextMenu(for: entry)
                         }
                     }
                     .onDelete(perform: deleteEntries)
@@ -139,6 +168,37 @@ struct EntryListView: View {
                     proxy.scrollTo("top", anchor: .top)
                 }
             }
+            .confirmationDialog(
+                "Delete Entry",
+                isPresented: Binding(
+                    get: { entryToDelete != nil },
+                    set: { if !$0 { entryToDelete = nil } }
+                ),
+                presenting: entryToDelete
+            ) { entry in
+                Button("Delete \"\(entry.title.isEmpty ? "Untitled" : entry.title)\"", role: .destructive) {
+                    onDelete(entry)
+                }
+            } message: { entry in
+                Text("Are you sure you want to delete this entry? This cannot be undone.")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func entryContextMenu(for entry: Entry) -> some View {
+        Button {
+            onPin(entry)
+        } label: {
+            Label(entry.isPinned ? "Unpin" : "Pin", systemImage: entry.isPinned ? "pin.slash" : "pin")
+        }
+        
+        Divider()
+        
+        Button(role: .destructive) {
+            entryToDelete = entry
+        } label: {
+            Label("Delete", systemImage: "trash")
         }
     }
     
@@ -148,8 +208,7 @@ struct EntryListView: View {
     
     private func deleteEntries(offsets: IndexSet) {
         for index in offsets {
-            let entry = unpinnedEntries[index]
-            modelContext.delete(entry)
+            entryToDelete = unpinnedEntries[index]
         }
     }
 }
@@ -207,6 +266,7 @@ struct EntryDetailView: View {
     @Query(sort: \Tag.name) private var allTags: [Tag]
     
     @State private var showingTagPicker = false
+    @State private var inlineTagName: String = ""
     @FocusState private var isTitleFocused: Bool
     
     var body: some View {
@@ -240,32 +300,26 @@ struct EntryDetailView: View {
                 HStack {
                     if !entry.tags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
+                            HStack(spacing: 6) {
                                 ForEach(entry.tags) { tag in
-                                    TagBadge(tag: tag)
-                                        .overlay(alignment: .topTrailing) {
-                                            Button {
-                                                removeTag(tag)
-                                            } label: {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                            .buttonStyle(.plain)
-                                            .offset(x: 4, y: -4)
-                                        }
+                                    RemovableTagBadge(tag: tag) {
+                                        removeTag(tag)
+                                    }
                                 }
                             }
                         }
                     }
                     
+                    inlineTagInput
+                    
                     Button {
                         showingTagPicker = true
                     } label: {
-                        Label("Add Tag", systemImage: "tag")
+                        Image(systemName: "tag")
                             .font(.caption)
                     }
                     .buttonStyle(.borderless)
+                    .help("Browse all tags")
                 }
                 
                 HStack {
@@ -303,6 +357,33 @@ struct EntryDetailView: View {
         }
     }
     
+    private var inlineTagInput: some View {
+        TextField("Add tag…", text: $inlineTagName)
+            .textFieldStyle(.plain)
+            .font(.caption)
+            .frame(width: 80)
+            .onSubmit {
+                addInlineTag()
+            }
+    }
+    
+    private func addInlineTag() {
+        let name = inlineTagName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        
+        // Find existing tag or create new one
+        if let existing = allTags.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            if !entry.tags.contains(existing) {
+                entry.tags.append(existing)
+            }
+        } else {
+            let newTag = Tag(name: name)
+            modelContext.insert(newTag)
+            entry.tags.append(newTag)
+        }
+        inlineTagName = ""
+    }
+    
     private func removeTag(_ tag: Tag) {
         if let index = entry.tags.firstIndex(of: tag) {
             entry.tags.remove(at: index)
@@ -324,30 +405,42 @@ struct TagPickerView: View {
     var body: some View {
         NavigationStack {
             List {
-                if !availableTags.isEmpty {
+                if !allTags.isEmpty {
                     Section {
-                        ForEach(availableTags) { tag in
+                        ForEach(allTags) { tag in
+                            let isAdded = entry.tags.contains(tag)
                             Button {
-                                addTag(tag)
+                                if isAdded {
+                                    removeTag(tag)
+                                } else {
+                                    addTag(tag)
+                                }
                             } label: {
                                 HStack {
                                     TagBadge(tag: tag)
                                     Spacer()
+                                    if isAdded {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.blue)
+                                    }
                                 }
                             }
                         }
                     } header: {
-                        Text("Available Tags")
+                        Text("Tags")
                     }
                 }
                 
                 Section {
                     HStack {
                         TextField("New tag name", text: $newTagName)
+                            .onSubmit {
+                                createAndAddTag()
+                            }
                         Button("Create") {
                             createAndAddTag()
                         }
-                        .disabled(newTagName.isEmpty)
+                        .disabled(newTagName.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 } header: {
                     Text("Create New Tag")
@@ -365,9 +458,9 @@ struct TagPickerView: View {
         .frame(minWidth: 400, minHeight: 300)
     }
     
-    private var availableTags: [Tag] {
-        allTags.filter { tag in
-            !entry.tags.contains(tag)
+    private func removeTag(_ tag: Tag) {
+        if let index = entry.tags.firstIndex(of: tag) {
+            entry.tags.remove(at: index)
         }
     }
     
@@ -375,15 +468,15 @@ struct TagPickerView: View {
         if !entry.tags.contains(tag) {
             entry.tags.append(tag)
         }
-        dismiss()
     }
     
     private func createAndAddTag() {
-        let newTag = Tag(name: newTagName)
+        let name = newTagName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let newTag = Tag(name: name)
         modelContext.insert(newTag)
         entry.tags.append(newTag)
         newTagName = ""
-        dismiss()
     }
 }
 
@@ -407,6 +500,41 @@ struct TagBadge: View {
             return Color(hex: hex) ?? .blue
         }
         return .blue
+    }
+}
+
+// MARK: - Removable Tag Badge
+
+struct RemovableTagBadge: View {
+    let tag: Tag
+    let onRemove: () -> Void
+    
+    private var tagColor: Color {
+        if let hex = tag.colorHex {
+            return Color(hex: hex) ?? .blue
+        }
+        return .blue
+    }
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(tag.name)
+                .font(.caption)
+            
+            Button {
+                onRemove()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 6)
+        .padding(.vertical, 2)
+        .background(tagColor.opacity(0.2))
+        .foregroundStyle(tagColor)
+        .clipShape(Capsule())
     }
 }
 
@@ -435,6 +563,39 @@ extension Color {
             blue:  Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+}
+
+// MARK: - Pinned Pane View
+
+struct PinnedPaneView: View {
+    @Bindable var entry: Entry
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "pin.fill")
+                    .foregroundStyle(.blue)
+                Text(entry.title.isEmpty ? "Untitled" : entry.title)
+                    .font(.headline)
+                Spacer()
+            }
+            .padding()
+            .background(Color(nsColor: .controlBackgroundColor))
+            
+            Divider()
+            
+            // Content
+            ScrollView {
+                Text(entry.content.isEmpty ? "No content" : entry.content)
+                    .font(.body)
+                    .foregroundStyle(entry.content.isEmpty ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .textSelection(.enabled)
+            }
+        }
     }
 }
 
@@ -479,6 +640,6 @@ struct SettingsView: View {
 
 
 #Preview {
-    ContentView(newEntryTrigger: .constant(false))
+    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false))
         .modelContainer(for: [Entry.self, Tag.self], inMemory: true)
 }
