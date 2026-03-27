@@ -13,12 +13,14 @@ import KeyboardShortcuts
 struct ContentView: View {
     @Binding var newEntryTrigger: Bool
     @Binding var showPinnedPane: Bool
+    @Binding var focusTagFieldTrigger: Bool
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
     
     @State private var selectedEntry: Entry?
     @State private var shouldFocusTitle = false
+    @State private var shouldFocusTagField = false
     
     private var pinnedEntry: Entry? {
         allEntries.first(where: { $0.isPinned })
@@ -41,7 +43,8 @@ struct ContentView: View {
                         onPin: {
                             pinEntry(entry)
                         },
-                        shouldFocusTitle: $shouldFocusTitle
+                        shouldFocusTitle: $shouldFocusTitle,
+                        shouldFocusTagField: $shouldFocusTagField
                     )
                 } else if let firstEntry = allEntries.first {
                     EntryDetailView(
@@ -49,7 +52,8 @@ struct ContentView: View {
                         onPin: {
                             pinEntry(firstEntry)
                         },
-                        shouldFocusTitle: $shouldFocusTitle
+                        shouldFocusTitle: $shouldFocusTitle,
+                        shouldFocusTagField: $shouldFocusTagField
                     )
                 } else {
                     ContentUnavailableView(
@@ -67,6 +71,9 @@ struct ContentView: View {
         }
         .onChange(of: newEntryTrigger) { oldValue, newValue in
             createNewEntry()
+        }
+        .onChange(of: focusTagFieldTrigger) { oldValue, newValue in
+            shouldFocusTagField = true
         }
         .onGlobalKeyboardShortcut(.showWindow) {_ in 
             showPinnedEntry()
@@ -261,6 +268,7 @@ struct EntryDetailView: View {
     @Bindable var entry: Entry
     let onPin: () -> Void
     @Binding var shouldFocusTitle: Bool
+    @Binding var shouldFocusTagField: Bool
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Tag.name) private var allTags: [Tag]
@@ -268,6 +276,7 @@ struct EntryDetailView: View {
     @State private var showingTagPicker = false
     @State private var inlineTagName: String = ""
     @FocusState private var isTitleFocused: Bool
+    @FocusState private var isTagFieldFocused: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -355,6 +364,12 @@ struct EntryDetailView: View {
                 shouldFocusTitle = false
             }
         }
+        .onChange(of: shouldFocusTagField) { oldValue, newValue in
+            if newValue {
+                isTagFieldFocused = true
+                shouldFocusTagField = false
+            }
+        }
     }
     
     private var inlineTagInput: some View {
@@ -362,6 +377,7 @@ struct EntryDetailView: View {
             .textFieldStyle(.plain)
             .font(.caption)
             .frame(width: 80)
+            .focused($isTagFieldFocused)
             .onSubmit {
                 addInlineTag()
             }
@@ -640,6 +656,6 @@ struct SettingsView: View {
 
 
 #Preview {
-    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false))
+    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false))
         .modelContainer(for: [Entry.self, Tag.self], inMemory: true)
 }

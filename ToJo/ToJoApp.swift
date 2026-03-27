@@ -7,24 +7,21 @@
 
 import SwiftUI
 import SwiftData
-import Observation
 
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
-    static let showWindow = Self("showWindow", default: .init(.t, modifiers: [.command, .shift]))
+    static let showWindow = Self("showWindow", default: .init(.j, modifiers: [.command, .shift]))
 }
 
 @main
 struct ToJoApp: App {
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
-    
+
     @State private var newEntryTrigger = false
     @State private var showPinnedPane = false
-    
-    @State private var appState = AppState()
+    @State private var focusTagFieldTrigger = false
 
-    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Entry.self,
@@ -41,7 +38,7 @@ struct ToJoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(newEntryTrigger: $newEntryTrigger, showPinnedPane: $showPinnedPane)
+            ContentView(newEntryTrigger: $newEntryTrigger, showPinnedPane: $showPinnedPane, focusTagFieldTrigger: $focusTagFieldTrigger)
         }
         .modelContainer(sharedModelContainer)
         .commands {
@@ -50,23 +47,21 @@ struct ToJoApp: App {
                     newEntryTrigger.toggle()
                 }
                 .keyboardShortcut("n", modifiers: .command)
+
+                Button("Add Tag") {
+                    focusTagFieldTrigger.toggle()
+                }
+                .keyboardShortcut("t", modifiers: .command)
             }
-            
+
             CommandGroup(after: .sidebar) {
                 Button("Toggle Pinned Pane") {
                     showPinnedPane.toggle()
                 }
                 .keyboardShortcut("d", modifiers: .command)
             }
-            
-            CommandGroup(after: .windowArrangement) {
-                Button("Show Window") {
-                    appDelegate.showMainWindow()
-                }
-                .keyboardShortcut("0", modifiers: .command)
-            }
         }
-        
+
         #if os(macOS)
         Settings {
             SettingsView()
@@ -76,31 +71,24 @@ struct ToJoApp: App {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Global hotkeys (work even when app is not active / window is closed)
+        KeyboardShortcuts.onKeyDown(for: .showWindow) {
+            AppDelegate.showMainWindow()
+        }
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            showMainWindow()
+            AppDelegate.showMainWindow()
         }
         return true
     }
-    
-    func showMainWindow() {
+
+    static func showMainWindow() {
         NSApp.activate()
         if let window = NSApp.windows.first(where: { $0.canBecomeKey }) {
             window.makeKeyAndOrderFront(nil)
-        }
-    }
-}
-
-@MainActor
-@Observable
-final class AppState {
-    init() {
-        KeyboardShortcuts.onKeyDown(for: .showWindow) {
-            NSApp.activate()
-            // Ensure the main window is visible and key
-            if let window = NSApp.windows.first(where: { $0.canBecomeKey }) {
-                window.makeKeyAndOrderFront(nil)
-            }
         }
     }
 }
