@@ -17,7 +17,6 @@ extension KeyboardShortcuts.Name {
 
 @main
 struct ToJoApp: App {
-    @AppStorage("globalHotkey") private var globalHotkey: String = "command+shift+t"
     @State private var newEntryTrigger = false
     
     @State private var appState = AppState()
@@ -63,9 +62,12 @@ struct ToJoApp: App {
 @Observable
 final class AppState {
     init() {
-        KeyboardShortcuts.onKeyDown(for: .showWindow) { [self] in
-            NSApp.activate(ignoringOtherApps: true)
-//            NSApplication.shared.activate(ignoringOtherApps: true)
+        KeyboardShortcuts.onKeyDown(for: .showWindow) {
+            NSApp.activate()
+            // Ensure the main window is visible and key
+            if let window = NSApp.windows.first(where: { $0.canBecomeKey }) {
+                window.makeKeyAndOrderFront(nil)
+            }
         }
     }
 }

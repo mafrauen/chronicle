@@ -225,7 +225,7 @@ struct EntryDetailView: View {
             TextEditor(text: $entry.content)
                 .font(.body)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal)
+                .padding()
                 .onChange(of: entry.content) { oldValue, newValue in
                     entry.lastModifiedAt = Date()
                 }
