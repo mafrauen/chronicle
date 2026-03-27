@@ -14,6 +14,7 @@ struct ContentView: View {
     @Binding var newEntryTrigger: Bool
     @Binding var showPinnedPane: Bool
     @Binding var focusTagFieldTrigger: Bool
+    @Binding var searchTrigger: Bool
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
@@ -21,6 +22,7 @@ struct ContentView: View {
     @State private var selectedEntry: Entry?
     @State private var shouldFocusTitle = false
     @State private var shouldFocusTagField = false
+    @State private var shouldFocusSearch = false
     
     private var pinnedEntry: Entry? {
         allEntries.first(where: { $0.isPinned })
@@ -32,6 +34,7 @@ struct ContentView: View {
                 EntryListView(
                     entries: allEntries,
                     selectedEntry: $selectedEntry,
+                    shouldFocusSearch: $shouldFocusSearch,
                     onPin: pinEntry,
                     onNewEntry: createNewEntry,
                     onDelete: deleteEntry
@@ -46,11 +49,11 @@ struct ContentView: View {
                         shouldFocusTitle: $shouldFocusTitle,
                         shouldFocusTagField: $shouldFocusTagField
                     )
-                } else if let firstEntry = allEntries.first {
+                } else if let fallbackEntry = pinnedEntry ?? allEntries.first {
                     EntryDetailView(
-                        entry: firstEntry, 
+                        entry: fallbackEntry, 
                         onPin: {
-                            pinEntry(firstEntry)
+                            pinEntry(fallbackEntry)
                         },
                         shouldFocusTitle: $shouldFocusTitle,
                         shouldFocusTagField: $shouldFocusTagField
@@ -74,6 +77,9 @@ struct ContentView: View {
         }
         .onChange(of: focusTagFieldTrigger) { oldValue, newValue in
             shouldFocusTagField = true
+        }
+        .onChange(of: searchTrigger) { oldValue, newValue in
+            shouldFocusSearch = true
         }
         .onGlobalKeyboardShortcut(.showWindow) {_ in 
             showPinnedEntry()
@@ -138,6 +144,7 @@ enum DateFilter: String, CaseIterable, Identifiable {
 struct EntryListView: View {
     let entries: [Entry]
     @Binding var selectedEntry: Entry?
+    @Binding var shouldFocusSearch: Bool
     let onPin: (Entry) -> Void
     let onNewEntry: () -> Void
     let onDelete: (Entry) -> Void
@@ -147,6 +154,7 @@ struct EntryListView: View {
     
     @State private var entryToDelete: Entry?
     @State private var searchText: String = ""
+    @State private var isSearchPresented = false
     @State private var selectedTags: Set<PersistentIdentifier> = []
     @State private var dateFilter: DateFilter = .all
     @State private var showFilters = false
@@ -205,8 +213,8 @@ struct EntryListView: View {
                     }
                 }
                 
-                // Pinned entry section (hidden when filtering)
-                if !isFiltering, let pinnedEntry = entries.first(where: { $0.isPinned }) {
+                // Pinned entry section
+                if let pinnedEntry = filteredPinnedEntry {
                     Section {
                         NavigationLink(value: pinnedEntry) {
                             EntryRowView(entry: pinnedEntry)
@@ -234,7 +242,25 @@ struct EntryListView: View {
                     Text("Entries")
                 }
             }
-            .searchable(text: $searchText, prompt: "Filter entries")
+            .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "Filter entries")
+            .onChange(of: shouldFocusSearch) { oldValue, newValue in
+                if newValue {
+                    if isSearchPresented {
+                        isSearchPresented = false
+                        DispatchQueue.main.async {
+                            isSearchPresented = true
+                        }
+                    } else {
+                        isSearchPresented = true
+                    }
+                    shouldFocusSearch = false
+                }
+            }
+            .onChange(of: searchText) { oldValue, newValue in
+                if !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                    selectedEntry = nil
+                }
+            }
             .navigationTitle("ToJo")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -298,6 +324,35 @@ struct EntryListView: View {
         !searchText.trimmingCharacters(in: .whitespaces).isEmpty ||
         !selectedTags.isEmpty ||
         dateFilter != .all
+    }
+    
+    private var filteredPinnedEntry: Entry? {
+        guard let pinnedEntry = entries.first(where: { $0.isPinned }) else { return nil }
+        
+        // If not filtering, always show pinned
+        if !isFiltering { return pinnedEntry }
+        
+        // Text search
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            let matchesText = pinnedEntry.title.localizedCaseInsensitiveContains(query) ||
+                pinnedEntry.content.localizedCaseInsensitiveContains(query) ||
+                pinnedEntry.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
+            if !matchesText { return nil }
+        }
+        
+        // Tag filter
+        if !selectedTags.isEmpty {
+            let matchesTags = pinnedEntry.tags.contains { selectedTags.contains($0.persistentModelID) }
+            if !matchesTags { return nil }
+        }
+        
+        // Date filter
+        if let cutoff = dateFilter.date {
+            if pinnedEntry.createdAt < cutoff { return nil }
+        }
+        
+        return pinnedEntry
     }
     
     private var unpinnedEntries: [Entry] {
@@ -925,6 +980,6 @@ struct SettingsView: View {
 
 
 #Preview {
-    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false))
+    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false))
         .modelContainer(for: [Entry.self, Tag.self], inMemory: true)
 }

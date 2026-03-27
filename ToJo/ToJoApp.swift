@@ -21,6 +21,7 @@ struct ToJoApp: App {
     @State private var newEntryTrigger = false
     @State private var showPinnedPane = false
     @State private var focusTagFieldTrigger = false
+    @State private var searchTrigger = false
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -38,7 +39,7 @@ struct ToJoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(newEntryTrigger: $newEntryTrigger, showPinnedPane: $showPinnedPane, focusTagFieldTrigger: $focusTagFieldTrigger)
+            ContentView(newEntryTrigger: $newEntryTrigger, showPinnedPane: $showPinnedPane, focusTagFieldTrigger: $focusTagFieldTrigger, searchTrigger: $searchTrigger)
         }
         .modelContainer(sharedModelContainer)
         .commands {
@@ -59,6 +60,13 @@ struct ToJoApp: App {
                     showPinnedPane.toggle()
                 }
                 .keyboardShortcut("d", modifiers: .command)
+            }
+            
+            CommandGroup(after: .textEditing) {
+                Button("Find Entries") {
+                    searchTrigger.toggle()
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
         }
 
