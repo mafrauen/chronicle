@@ -720,7 +720,7 @@ struct TagPickerView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search or create tags…", text: $searchText)
+                TextField("Search tags…", text: $searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
                     .onSubmit {
@@ -789,13 +789,8 @@ struct TagPickerView: View {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return }
         
-        // If there's an exact match, toggle it
-        if let exact = allTags.first(where: { $0.name.caseInsensitiveCompare(query) == .orderedSame }) {
-            if !entry.tags.contains(exact) {
-                addTag(exact)
-            }
-        } else if let first = filteredTags.first {
-            // Add the top filtered result
+        if let first = filteredTags.first {
+            // Pick the top filtered result
             if !entry.tags.contains(first) {
                 addTag(first)
             }
