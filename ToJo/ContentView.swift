@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var shouldFocusTitle = false
     @State private var shouldFocusTagField = false
     @State private var shouldFocusSearch = false
+    @State private var firstFilteredEntry: Entry?
     
     private var pinnedEntry: Entry? {
         allEntries.first(where: { $0.isPinned })
@@ -35,6 +36,7 @@ struct ContentView: View {
                     entries: allEntries,
                     selectedEntry: $selectedEntry,
                     shouldFocusSearch: $shouldFocusSearch,
+                    firstFilteredEntry: $firstFilteredEntry,
                     onPin: pinEntry,
                     onNewEntry: createNewEntry,
                     onDelete: deleteEntry
@@ -49,7 +51,7 @@ struct ContentView: View {
                         shouldFocusTitle: $shouldFocusTitle,
                         shouldFocusTagField: $shouldFocusTagField
                     )
-                } else if let fallbackEntry = pinnedEntry ?? allEntries.first {
+                } else if let fallbackEntry = firstFilteredEntry ?? pinnedEntry ?? allEntries.first {
                     EntryDetailView(
                         entry: fallbackEntry, 
                         onPin: {
@@ -145,6 +147,7 @@ struct EntryListView: View {
     let entries: [Entry]
     @Binding var selectedEntry: Entry?
     @Binding var shouldFocusSearch: Bool
+    @Binding var firstFilteredEntry: Entry?
     let onPin: (Entry) -> Void
     let onNewEntry: () -> Void
     let onDelete: (Entry) -> Void
@@ -156,6 +159,7 @@ struct EntryListView: View {
     @State private var searchText: String = ""
     @State private var isSearchPresented = false
     @State private var selectedTags: Set<PersistentIdentifier> = []
+    @State private var excludedTags: Set<PersistentIdentifier> = []
     @State private var dateFilter: DateFilter = .all
     @State private var showFilters = false
     
@@ -174,36 +178,80 @@ struct EntryListView: View {
                         }
                         .pickerStyle(.menu)
                         
-                        // Tag filter
-                        if !allTags.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Tags")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                FlowLayout(spacing: 4) {
-                                    ForEach(allTags) { tag in
-                                        let isSelected = selectedTags.contains(tag.persistentModelID)
+                        // Include tags filter
+                        if !availableTagsForInclude.isEmpty || !selectedTags.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                if !availableTagsForInclude.isEmpty {
+                                    Picker("Include Tag", selection: Binding<PersistentIdentifier?>(
+                                        get: { nil },
+                                        set: { id in
+                                            if let id { selectedTags.insert(id) }
+                                        }
+                                    )) {
+                                        Text("Include tag…").tag(nil as PersistentIdentifier?)
+                                        ForEach(availableTagsForInclude) { tag in
+                                            Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+                                
+                                ForEach(includedTagObjects) { tag in
+                                    HStack {
                                         TagBadge(tag: tag)
-                                            .opacity(isSelected ? 1.0 : 0.5)
-                                            .overlay(
-                                                Capsule()
-                                                    .strokeBorder(isSelected ? Color.blue : Color.clear, lineWidth: 1.5)
-                                            )
-                                            .onTapGesture {
-                                                if isSelected {
-                                                    selectedTags.remove(tag.persistentModelID)
-                                                } else {
-                                                    selectedTags.insert(tag.persistentModelID)
-                                                }
-                                            }
+                                        Spacer()
+                                        Button {
+                                            selectedTags.remove(tag.persistentModelID)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
                             }
                         }
                         
-                        if !selectedTags.isEmpty || dateFilter != .all {
+                        // Exclude tags filter
+                        if !availableTagsForExclude.isEmpty || !excludedTags.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                if !availableTagsForExclude.isEmpty {
+                                    Picker("Exclude Tag", selection: Binding<PersistentIdentifier?>(
+                                        get: { nil },
+                                        set: { id in
+                                            if let id { excludedTags.insert(id) }
+                                        }
+                                    )) {
+                                        Text("Exclude tag…").tag(nil as PersistentIdentifier?)
+                                        ForEach(availableTagsForExclude) { tag in
+                                            Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+                                
+                                ForEach(excludedTagObjects) { tag in
+                                    HStack {
+                                        TagBadge(tag: tag)
+                                        Spacer()
+                                        Button {
+                                            excludedTags.remove(tag.persistentModelID)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if !selectedTags.isEmpty || !excludedTags.isEmpty || dateFilter != .all {
                             Button("Clear Filters") {
                                 selectedTags.removeAll()
+                                excludedTags.removeAll()
                                 dateFilter = .all
                             }
                             .font(.caption)
@@ -260,6 +308,16 @@ struct EntryListView: View {
                 if !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
                     selectedEntry = nil
                 }
+                updateFirstFilteredEntry()
+            }
+            .onChange(of: selectedTags) { _, _ in
+                updateFirstFilteredEntry()
+            }
+            .onChange(of: excludedTags) { _, _ in
+                updateFirstFilteredEntry()
+            }
+            .onChange(of: dateFilter) { _, _ in
+                updateFirstFilteredEntry()
             }
             .navigationTitle("ToJo")
             .toolbar {
@@ -323,6 +381,7 @@ struct EntryListView: View {
     private var isFiltering: Bool {
         !searchText.trimmingCharacters(in: .whitespaces).isEmpty ||
         !selectedTags.isEmpty ||
+        !excludedTags.isEmpty ||
         dateFilter != .all
     }
     
@@ -341,10 +400,16 @@ struct EntryListView: View {
             if !matchesText { return nil }
         }
         
-        // Tag filter
+        // Include tag filter
         if !selectedTags.isEmpty {
             let matchesTags = pinnedEntry.tags.contains { selectedTags.contains($0.persistentModelID) }
             if !matchesTags { return nil }
+        }
+        
+        // Exclude tag filter
+        if !excludedTags.isEmpty {
+            let hasExcluded = pinnedEntry.tags.contains { excludedTags.contains($0.persistentModelID) }
+            if hasExcluded { return nil }
         }
         
         // Date filter
@@ -353,6 +418,22 @@ struct EntryListView: View {
         }
         
         return pinnedEntry
+    }
+    
+    private var availableTagsForInclude: [Tag] {
+        allTags.filter { !selectedTags.contains($0.persistentModelID) && !excludedTags.contains($0.persistentModelID) }
+    }
+    
+    private var availableTagsForExclude: [Tag] {
+        allTags.filter { !excludedTags.contains($0.persistentModelID) && !selectedTags.contains($0.persistentModelID) }
+    }
+    
+    private var includedTagObjects: [Tag] {
+        allTags.filter { selectedTags.contains($0.persistentModelID) }
+    }
+    
+    private var excludedTagObjects: [Tag] {
+        allTags.filter { excludedTags.contains($0.persistentModelID) }
     }
     
     private var unpinnedEntries: [Entry] {
@@ -372,10 +453,17 @@ struct EntryListView: View {
             }
         }
         
-        // Tag filter (OR: entry must have at least one of the selected tags)
+        // Include tag filter (OR: entry must have at least one of the selected tags)
         if !selectedTags.isEmpty {
             result = result.filter { entry in
                 entry.tags.contains { selectedTags.contains($0.persistentModelID) }
+            }
+        }
+        
+        // Exclude tag filter (entry must NOT have any of the excluded tags)
+        if !excludedTags.isEmpty {
+            result = result.filter { entry in
+                !entry.tags.contains { excludedTags.contains($0.persistentModelID) }
             }
         }
         
@@ -390,6 +478,14 @@ struct EntryListView: View {
     private func deleteEntries(offsets: IndexSet) {
         for index in offsets {
             entryToDelete = filteredUnpinnedEntries[index]
+        }
+    }
+    
+    private func updateFirstFilteredEntry() {
+        if isFiltering {
+            firstFilteredEntry = filteredPinnedEntry ?? filteredUnpinnedEntries.first
+        } else {
+            firstFilteredEntry = nil
         }
     }
 }
