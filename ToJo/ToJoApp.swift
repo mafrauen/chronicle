@@ -8,10 +8,9 @@
 import SwiftUI
 import SwiftData
 
-import KeyboardShortcuts
 
-extension KeyboardShortcuts.Name {
-    static let showWindow = Self("showWindow", default: .init(.j, modifiers: [.command, .shift]))
+extension Notification.Name {
+    static let tojoURLReceived = Notification.Name("tojoURLReceived")
 }
 
 @main
@@ -22,6 +21,8 @@ struct ToJoApp: App {
     @State private var showPinnedPane = false
     @State private var focusTagFieldTrigger = false
     @State private var searchTrigger = false
+    @State private var pendingEntryTitle: String?
+    @State private var pendingEntryContent: String?
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -39,8 +40,22 @@ struct ToJoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(newEntryTrigger: $newEntryTrigger, showPinnedPane: $showPinnedPane, focusTagFieldTrigger: $focusTagFieldTrigger, searchTrigger: $searchTrigger)
+            ContentView(
+                newEntryTrigger: $newEntryTrigger,
+                showPinnedPane: $showPinnedPane,
+                focusTagFieldTrigger: $focusTagFieldTrigger,
+                searchTrigger: $searchTrigger,
+                pendingEntryTitle: $pendingEntryTitle,
+                pendingEntryContent: $pendingEntryContent
+            )
+            .onReceive(NotificationCenter.default.publisher(for: .tojoURLReceived)) { notification in
+                if let url = notification.object as? URL {
+                    handleURL(url)
+                }
+            }
+            .handlesExternalEvents(preferring: ["tojo"], allowing: ["*"])
         }
+        .handlesExternalEvents(matching: ["tojo"])
         .modelContainer(sharedModelContainer)
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -76,16 +91,36 @@ struct ToJoApp: App {
         }
         #endif
     }
+    
+    private func handleURL(_ url: URL) {
+        AppDelegate.showMainWindow()
+        
+        guard url.scheme == "tojo" else { return }
+        let action = url.host(percentEncoded: false) ?? ""
+        
+        switch action {
+        case "new":
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let queryItems = components?.queryItems ?? []
+            pendingEntryTitle = queryItems.first(where: { $0.name == "title" })?.value
+            pendingEntryContent = queryItems.first(where: { $0.name == "content" })?.value
+            newEntryTrigger.toggle()
+        case "open":
+            break // showMainWindow already called above
+        default:
+            break
+        }
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // Global hotkeys (work even when app is not active / window is closed)
-        KeyboardShortcuts.onKeyDown(for: .showWindow) {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
             AppDelegate.showMainWindow()
+            NotificationCenter.default.post(name: .tojoURLReceived, object: url)
         }
     }
-
+    
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             AppDelegate.showMainWindow()
@@ -97,6 +132,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         if let window = NSApp.windows.first(where: { $0.canBecomeKey }) {
             window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
         }
     }
 }

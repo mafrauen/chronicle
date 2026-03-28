@@ -8,13 +8,14 @@
 import SwiftUI
 import SwiftData
 
-import KeyboardShortcuts
 
 struct ContentView: View {
     @Binding var newEntryTrigger: Bool
     @Binding var showPinnedPane: Bool
     @Binding var focusTagFieldTrigger: Bool
     @Binding var searchTrigger: Bool
+    @Binding var pendingEntryTitle: String?
+    @Binding var pendingEntryContent: String?
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
@@ -83,15 +84,16 @@ struct ContentView: View {
         .onChange(of: searchTrigger) { oldValue, newValue in
             shouldFocusSearch = true
         }
-        .onGlobalKeyboardShortcut(.showWindow) {_ in 
-            showPinnedEntry()
-        }
     }
     
     private func createNewEntry() {
-        let newEntry = Entry(title: "New Entry")
+        let title = pendingEntryTitle ?? "New Entry"
+        let content = pendingEntryContent ?? ""
+        let newEntry = Entry(title: title, content: content)
         modelContext.insert(newEntry)
         selectedEntry = newEntry
+        pendingEntryTitle = nil
+        pendingEntryContent = nil
         
         // Trigger focus on title field
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -337,11 +339,6 @@ struct EntryListView: View {
                         Label("Filters", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
                     .help("Toggle filters")
-                }
-            }
-            .onGlobalKeyboardShortcut(.showWindow) {_ in
-                withAnimation{
-                    proxy.scrollTo("top", anchor: .top)
                 }
             }
             .confirmationDialog(
@@ -1036,28 +1033,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Global Hotkey to Show Window")
-                        .font(.headline)
-                    
-                    KeyboardShortcuts.Recorder(for: .showWindow)
-                    
-                    Text("Press your desired key combination to set the global hotkey")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Keyboard Shortcuts")
-            } footer: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("This global hotkey will bring the ToJo window to the front from anywhere.")
-                    Text("⌘N creates a new entry when the app is focused.")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            
-            Section {
                 LabeledContent("App Version", value: "1.0.0")
                 LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
             } header: {
@@ -1071,6 +1046,6 @@ struct SettingsView: View {
 
 
 #Preview {
-    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false))
+    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false), pendingEntryTitle: .constant(nil), pendingEntryContent: .constant(nil))
         .modelContainer(for: [Entry.self, Tag.self], inMemory: true)
 }
