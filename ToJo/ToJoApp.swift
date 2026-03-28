@@ -129,10 +129,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     static func showMainWindow() {
-        NSApp.activate()
         if let window = NSApp.windows.first(where: { $0.canBecomeKey }) {
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
+        }
+        NSApp.activate()
+        // Retry activation after a brief delay to ensure focus when called from URL schemes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSApp.activate()
+            if let window = NSApp.windows.first(where: { $0.canBecomeKey }) {
+                window.makeKeyAndOrderFront(nil)
+            }
         }
     }
 }
