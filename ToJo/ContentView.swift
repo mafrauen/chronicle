@@ -16,9 +16,13 @@ struct ContentView: View {
     @Binding var searchTrigger: Bool
     @Binding var pendingEntryTitle: String?
     @Binding var pendingEntryContent: String?
+    @Binding var pendingSelectTitle: String?
+    @Binding var pendingSelectTag: String?
+    @Binding var shouldFocusContent: Bool
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
+    @Query(sort: \Tag.name) private var allTags: [Tag]
     
     @State private var selectedEntry: Entry?
     @State private var shouldFocusTitle = false
@@ -50,7 +54,8 @@ struct ContentView: View {
                             pinEntry(entry)
                         },
                         shouldFocusTitle: $shouldFocusTitle,
-                        shouldFocusTagField: $shouldFocusTagField
+                        shouldFocusTagField: $shouldFocusTagField,
+                        shouldFocusContent: $shouldFocusContent
                     )
                 } else if let fallbackEntry = firstFilteredEntry ?? pinnedEntry ?? allEntries.first {
                     EntryDetailView(
@@ -59,7 +64,8 @@ struct ContentView: View {
                             pinEntry(fallbackEntry)
                         },
                         shouldFocusTitle: $shouldFocusTitle,
-                        shouldFocusTagField: $shouldFocusTagField
+                        shouldFocusTagField: $shouldFocusTagField,
+                        shouldFocusContent: $shouldFocusContent
                     )
                 } else {
                     ContentUnavailableView(
@@ -83,6 +89,28 @@ struct ContentView: View {
         }
         .onChange(of: searchTrigger) { oldValue, newValue in
             shouldFocusSearch = true
+        }
+        .onChange(of: pendingSelectTitle) { oldValue, newValue in
+            guard let title = newValue else { return }
+            if let existing = allEntries.first(where: { $0.title == title }) {
+                selectedEntry = existing
+            } else {
+                let newEntry = Entry(title: title)
+                modelContext.insert(newEntry)
+                if let tagName = pendingSelectTag {
+                    let tag = allTags.first(where: { $0.name == tagName }) ?? Tag(name: tagName)
+                    if tag.modelContext == nil {
+                        modelContext.insert(tag)
+                    }
+                    newEntry.tags.append(tag)
+                }
+                selectedEntry = newEntry
+            }
+            pendingSelectTitle = nil
+            pendingSelectTag = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                shouldFocusContent = true
+            }
         }
     }
     
@@ -536,12 +564,14 @@ struct EntryDetailView: View {
     let onPin: () -> Void
     @Binding var shouldFocusTitle: Bool
     @Binding var shouldFocusTagField: Bool
+    @Binding var shouldFocusContent: Bool
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Tag.name) private var allTags: [Tag]
     
     @State private var showingTagPicker = false
     @FocusState private var isTitleFocused: Bool
+    @FocusState private var isContentFocused: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -558,6 +588,7 @@ struct EntryDetailView: View {
             // Content editor
             TextEditor(text: $entry.content)
                 .font(.body)
+                .focused($isContentFocused)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
                 .onChange(of: entry.content) { oldValue, newValue in
@@ -631,6 +662,12 @@ struct EntryDetailView: View {
             if newValue {
                 showingTagPicker = true
                 shouldFocusTagField = false
+            }
+        }
+        .onChange(of: shouldFocusContent) { oldValue, newValue in
+            if newValue {
+                isContentFocused = true
+                shouldFocusContent = false
             }
         }
     }
@@ -1046,6 +1083,6 @@ struct SettingsView: View {
 
 
 #Preview {
-    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false), pendingEntryTitle: .constant(nil), pendingEntryContent: .constant(nil))
+    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false), pendingEntryTitle: .constant(nil), pendingEntryContent: .constant(nil), pendingSelectTitle: .constant(nil), pendingSelectTag: .constant(nil), shouldFocusContent: .constant(false))
         .modelContainer(for: [Entry.self, Tag.self], inMemory: true)
 }

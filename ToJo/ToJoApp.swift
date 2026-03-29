@@ -23,6 +23,9 @@ struct ToJoApp: App {
     @State private var searchTrigger = false
     @State private var pendingEntryTitle: String?
     @State private var pendingEntryContent: String?
+    @State private var pendingSelectTitle: String?
+    @State private var pendingSelectTag: String?
+    @State private var shouldFocusContent = false
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -46,7 +49,10 @@ struct ToJoApp: App {
                 focusTagFieldTrigger: $focusTagFieldTrigger,
                 searchTrigger: $searchTrigger,
                 pendingEntryTitle: $pendingEntryTitle,
-                pendingEntryContent: $pendingEntryContent
+                pendingEntryContent: $pendingEntryContent,
+                pendingSelectTitle: $pendingSelectTitle,
+                pendingSelectTag: $pendingSelectTag,
+                shouldFocusContent: $shouldFocusContent
             )
             .onReceive(NotificationCenter.default.publisher(for: .tojoURLReceived)) { notification in
                 if let url = notification.object as? URL {
@@ -105,6 +111,13 @@ struct ToJoApp: App {
             pendingEntryTitle = queryItems.first(where: { $0.name == "title" })?.value
             pendingEntryContent = queryItems.first(where: { $0.name == "content" })?.value
             newEntryTrigger.toggle()
+        case "entry":
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let queryItems = components?.queryItems ?? []
+            pendingSelectTag = queryItems.first(where: { $0.name == "tag" })?.value
+            if let title = queryItems.first(where: { $0.name == "title" })?.value {
+                pendingSelectTitle = title
+            }
         case "open":
             break // showMainWindow already called above
         default:
