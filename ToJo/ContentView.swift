@@ -582,7 +582,7 @@ struct EntryDetailView: View {
                 .focused($isTitleFocused)
                 .padding()
                 .background(Color(nsColor: .controlBackgroundColor))
-            
+
             Divider()
             
             // Content editor
@@ -591,6 +591,7 @@ struct EntryDetailView: View {
                 .focused($isContentFocused)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
+                .background(Color(nsColor: .controlBackgroundColor))
                 .onChange(of: entry.content) { oldValue, newValue in
                     entry.lastModifiedAt = Date()
                 }
