@@ -297,6 +297,13 @@ struct EntryListView: View {
                         NavigationLink(value: pinnedEntry) {
                             EntryRowView(entry: pinnedEntry)
                         }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                entryToDelete = pinnedEntry
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                         .contextMenu {
                             entryContextMenu(for: pinnedEntry)
                         }
@@ -311,11 +318,17 @@ struct EntryListView: View {
                         NavigationLink(value: entry) {
                             EntryRowView(entry: entry)
                         }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                entryToDelete = entry
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                         .contextMenu {
                             entryContextMenu(for: entry)
                         }
                     }
-                    .onDelete(perform: deleteEntries)
                 } header: {
                     Text("Entries")
                 }
@@ -500,11 +513,7 @@ struct EntryListView: View {
         return result
     }
     
-    private func deleteEntries(offsets: IndexSet) {
-        for index in offsets {
-            entryToDelete = filteredUnpinnedEntries[index]
-        }
-    }
+
     
     private func updateFirstFilteredEntry() {
         if isFiltering {
