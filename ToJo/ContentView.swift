@@ -942,14 +942,15 @@ struct TagPickerRow: View {
 
 struct TagBadge: View {
     let tag: Tag
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         Text(tag.name)
             .font(.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
-            .background(tagColor.opacity(0.2))
-            .foregroundStyle(tagColor)
+            .background(tagColor.opacity(0.15))
+            .foregroundStyle(textColor)
             .clipShape(Capsule())
     }
     
@@ -959,6 +960,12 @@ struct TagBadge: View {
         }
         return .blue
     }
+    
+    private var textColor: Color {
+        // Mix toward black in light mode, white in dark mode for readable contrast
+        let mix: Color = colorScheme == .dark ? .white : .black
+        return tagColor.mix(with: mix, by: 0.4)
+    }
 }
 
 // MARK: - Removable Tag Badge
@@ -966,12 +973,18 @@ struct TagBadge: View {
 struct RemovableTagBadge: View {
     let tag: Tag
     let onRemove: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
     
     private var tagColor: Color {
         if let hex = tag.colorHex {
             return Color(hex: hex) ?? .blue
         }
         return .blue
+    }
+    
+    private var textColor: Color {
+        let mix: Color = colorScheme == .dark ? .white : .black
+        return tagColor.mix(with: mix, by: 0.4)
     }
     
     var body: some View {
@@ -990,8 +1003,8 @@ struct RemovableTagBadge: View {
         .padding(.leading, 8)
         .padding(.trailing, 6)
         .padding(.vertical, 2)
-        .background(tagColor.opacity(0.2))
-        .foregroundStyle(tagColor)
+        .background(tagColor.opacity(0.15))
+        .foregroundStyle(textColor)
         .clipShape(Capsule())
     }
 }
