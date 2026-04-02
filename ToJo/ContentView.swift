@@ -989,7 +989,7 @@ struct TagBadge: View {
             .font(.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
-            .background(tagColor.opacity(0.15))
+            .background(tagColor.opacity(0.5))
             .foregroundStyle(textColor)
             .clipShape(Capsule())
     }
@@ -1004,7 +1004,7 @@ struct TagBadge: View {
     private var textColor: Color {
         // Mix toward black in light mode, white in dark mode for readable contrast
         let mix: Color = colorScheme == .dark ? .white : .black
-        return tagColor.mix(with: mix, by: 0.4)
+        return tagColor.mix(with: mix, by: 0.7)
     }
 }
 
@@ -1024,7 +1024,7 @@ struct RemovableTagBadge: View {
     
     private var textColor: Color {
         let mix: Color = colorScheme == .dark ? .white : .black
-        return tagColor.mix(with: mix, by: 0.4)
+        return tagColor.mix(with: mix, by: 0.7)
     }
     
     var body: some View {
@@ -1043,7 +1043,7 @@ struct RemovableTagBadge: View {
         .padding(.leading, 8)
         .padding(.trailing, 6)
         .padding(.vertical, 2)
-        .background(tagColor.opacity(0.15))
+        .background(tagColor.opacity(0.25))
         .foregroundStyle(textColor)
         .clipShape(Capsule())
     }
@@ -1097,10 +1097,11 @@ struct PinnedPaneView: View {
                 Image(systemName: "pin.fill")
                     .foregroundStyle(.blue)
                 Text(entry.title.isEmpty ? "Untitled" : entry.title)
-                    .font(.headline)
+                    .font(.title2)
                 Spacer()
             }
             .padding()
+            .padding([.bottom], 1.5)
             .background(Color(nsColor: .controlBackgroundColor))
             
             Divider()
