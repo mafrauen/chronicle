@@ -89,7 +89,7 @@ struct ToJoApp: App {
                 Button("Find Entries") {
                     searchTrigger.toggle()
                 }
-                .keyboardShortcut("f", modifiers: .command)
+                .keyboardShortcut("f", modifiers: [.command, .shift])
             }
             
             CommandGroup(replacing: .importExport) {
@@ -99,12 +99,6 @@ struct ToJoApp: App {
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             }
         }
-
-        #if os(macOS)
-        Settings {
-            SettingsView()
-        }
-        #endif
     }
     
     private func handleURL(_ url: URL) {

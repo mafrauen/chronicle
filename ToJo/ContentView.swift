@@ -1216,23 +1216,6 @@ enum EntryExporter {
     }
 }
 
-// MARK: - Settings View
-
-struct SettingsView: View {
-    var body: some View {
-        Form {
-            Section {
-                LabeledContent("App Version", value: "1.0.0")
-                LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown")
-            } header: {
-                Text("About")
-            }
-        }
-        .formStyle(.grouped)
-        .frame(width: 500, height: 300)
-    }
-}
-
 
 #Preview {
     ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false), pendingEntryTitle: .constant(nil), pendingEntryContent: .constant(nil), pendingSelectTitle: .constant(nil), pendingSelectTag: .constant(nil), shouldFocusContent: .constant(false), exportTrigger: .constant(false))
