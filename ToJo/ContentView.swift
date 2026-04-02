@@ -19,6 +19,7 @@ struct ContentView: View {
     @Binding var pendingSelectTitle: String?
     @Binding var pendingSelectTag: String?
     @Binding var shouldFocusContent: Bool
+    @Binding var exportTrigger: Bool
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
@@ -42,6 +43,7 @@ struct ContentView: View {
                     selectedEntry: $selectedEntry,
                     shouldFocusSearch: $shouldFocusSearch,
                     firstFilteredEntry: $firstFilteredEntry,
+                    exportTrigger: $exportTrigger,
                     onPin: pinEntry,
                     onNewEntry: createNewEntry,
                     onDelete: deleteEntry
@@ -178,6 +180,7 @@ struct EntryListView: View {
     @Binding var selectedEntry: Entry?
     @Binding var shouldFocusSearch: Bool
     @Binding var firstFilteredEntry: Entry?
+    @Binding var exportTrigger: Bool
     let onPin: (Entry) -> Void
     let onNewEntry: () -> Void
     let onDelete: (Entry) -> Void
@@ -192,6 +195,8 @@ struct EntryListView: View {
     @State private var excludedTags: Set<PersistentIdentifier> = []
     @State private var dateFilter: DateFilter = .all
     @State private var showFilters = false
+    @State private var showExporter = false
+    @State private var exportDocument: ExportDocument = ExportDocument()
     
     var body: some View {
         ScrollViewReader { proxy in
@@ -362,6 +367,9 @@ struct EntryListView: View {
             .onChange(of: dateFilter) { _, _ in
                 updateFirstFilteredEntry()
             }
+            .onChange(of: exportTrigger) { _, _ in
+                exportFilteredEntries()
+            }
             .navigationTitle("ToJo")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -396,6 +404,12 @@ struct EntryListView: View {
             } message: { entry in
                 Text("Are you sure you want to delete this entry? This cannot be undone.")
             }
+            .fileExporter(
+                isPresented: $showExporter,
+                document: exportDocument,
+                contentTypes: [.json, .commaSeparatedText, .plainText],
+                defaultFilename: "ToJo Export"
+            ) { _ in }
         }
     }
     
@@ -515,6 +529,15 @@ struct EntryListView: View {
     
 
     
+    private var allFilteredEntries: [Entry] {
+        var result: [Entry] = []
+        if let pinned = filteredPinnedEntry {
+            result.append(pinned)
+        }
+        result.append(contentsOf: filteredUnpinnedEntries)
+        return result
+    }
+    
     private func updateFirstFilteredEntry() {
         if isFiltering {
             firstFilteredEntry = filteredPinnedEntry ?? filteredUnpinnedEntries.first
@@ -522,6 +545,14 @@ struct EntryListView: View {
             firstFilteredEntry = nil
         }
     }
+    
+    private func exportFilteredEntries() {
+        guard !allFilteredEntries.isEmpty else { return }
+        exportDocument = ExportDocument(entries: allFilteredEntries)
+        showExporter = true
+    }
+    
+
 }
 
 // MARK: - Entry Row View
@@ -1087,6 +1118,104 @@ struct PinnedPaneView: View {
     }
 }
 
+// MARK: - Export Sheet View
+
+import UniformTypeIdentifiers
+
+struct ExportDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json, .commaSeparatedText, .plainText] }
+    
+    let csvContent: String
+    let jsonContent: String
+    let textContent: String
+    
+    init() {
+        self.csvContent = ""
+        self.jsonContent = ""
+        self.textContent = ""
+    }
+    
+    init(entries: [Entry]) {
+        self.csvContent = EntryExporter.csv(from: entries)
+        self.jsonContent = EntryExporter.json(from: entries)
+        self.textContent = EntryExporter.plainText(from: entries)
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        self.csvContent = ""
+        self.jsonContent = ""
+        self.textContent = ""
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let content: String
+        switch configuration.contentType {
+        case .commaSeparatedText:
+            content = csvContent
+        case .json:
+            content = jsonContent
+        default:
+            content = textContent
+        }
+        guard let data = content.data(using: .utf8) else {
+            throw CocoaError(.fileWriteInapplicableStringEncoding)
+        }
+        return FileWrapper(regularFileWithContents: data)
+    }
+}
+
+// MARK: - Entry Exporter
+
+enum EntryExporter {
+    static func csv(from entries: [Entry]) -> String {
+        var lines = ["\"Title\",\"Content\",\"Tags\",\"Created\",\"Modified\""]
+        for entry in entries {
+            let title = entry.title.replacingOccurrences(of: "\"", with: "\"\"")
+            let content = entry.content.replacingOccurrences(of: "\"", with: "\"\"")
+            let tags = entry.tags.map { $0.name.replacingOccurrences(of: ";", with: "\\;") }.joined(separator: "; ")
+            let created = ISO8601DateFormatter().string(from: entry.createdAt)
+            let modified = ISO8601DateFormatter().string(from: entry.lastModifiedAt)
+            lines.append("\"\(title)\",\"\(content)\",\"\(tags)\",\"\(created)\",\"\(modified)\"")
+        }
+        return lines.joined(separator: "\n")
+    }
+    
+    static func json(from entries: [Entry]) -> String {
+        let items = entries.map { entry -> [String: Any] in
+            [
+                "title": entry.title,
+                "content": entry.content,
+                "tags": entry.tags.map(\.name),
+                "created": ISO8601DateFormatter().string(from: entry.createdAt),
+                "modified": ISO8601DateFormatter().string(from: entry.lastModifiedAt),
+                "pinned": entry.isPinned
+            ]
+        }
+        
+        guard let data = try? JSONSerialization.data(withJSONObject: items, options: [.prettyPrinted, .sortedKeys]),
+              let string = String(data: data, encoding: .utf8) else {
+            return "[]"
+        }
+        return string
+    }
+    
+    static func plainText(from entries: [Entry]) -> String {
+        entries.map { entry in
+            var parts: [String] = []
+            parts.append(entry.title.isEmpty ? "Untitled" : entry.title)
+            parts.append("Created: \(ISO8601DateFormatter().string(from: entry.createdAt))")
+            if !entry.tags.isEmpty {
+                parts.append("Tags: \(entry.tags.map(\.name).joined(separator: ", "))")
+            }
+            if !entry.content.isEmpty {
+                parts.append("")
+                parts.append(entry.content)
+            }
+            return parts.joined(separator: "\n")
+        }.joined(separator: "\n\n// ---\n\n")
+    }
+}
+
 // MARK: - Settings View
 
 struct SettingsView: View {
@@ -1106,6 +1235,6 @@ struct SettingsView: View {
 
 
 #Preview {
-    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false), pendingEntryTitle: .constant(nil), pendingEntryContent: .constant(nil), pendingSelectTitle: .constant(nil), pendingSelectTag: .constant(nil), shouldFocusContent: .constant(false))
+    ContentView(newEntryTrigger: .constant(false), showPinnedPane: .constant(false), focusTagFieldTrigger: .constant(false), searchTrigger: .constant(false), pendingEntryTitle: .constant(nil), pendingEntryContent: .constant(nil), pendingSelectTitle: .constant(nil), pendingSelectTag: .constant(nil), shouldFocusContent: .constant(false), exportTrigger: .constant(false))
         .modelContainer(for: [Entry.self, Tag.self], inMemory: true)
 }

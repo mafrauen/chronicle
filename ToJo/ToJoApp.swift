@@ -26,6 +26,7 @@ struct ToJoApp: App {
     @State private var pendingSelectTitle: String?
     @State private var pendingSelectTag: String?
     @State private var shouldFocusContent = false
+    @State private var exportTrigger = false
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -52,7 +53,8 @@ struct ToJoApp: App {
                 pendingEntryContent: $pendingEntryContent,
                 pendingSelectTitle: $pendingSelectTitle,
                 pendingSelectTag: $pendingSelectTag,
-                shouldFocusContent: $shouldFocusContent
+                shouldFocusContent: $shouldFocusContent,
+                exportTrigger: $exportTrigger
             )
             .onReceive(NotificationCenter.default.publisher(for: .tojoURLReceived)) { notification in
                 if let url = notification.object as? URL {
@@ -88,6 +90,13 @@ struct ToJoApp: App {
                     searchTrigger.toggle()
                 }
                 .keyboardShortcut("f", modifiers: .command)
+            }
+            
+            CommandGroup(replacing: .importExport) {
+                Button("Export Entries…") {
+                    exportTrigger.toggle()
+                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
             }
         }
 
