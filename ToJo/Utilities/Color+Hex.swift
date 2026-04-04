@@ -30,6 +30,15 @@ extension Color {
         )
     }
 
+    /// Returns `.black` or `.white` — whichever contrasts better with this color.
+    var contrastingTextColor: Color {
+        guard let components = NSColor(self).usingColorSpace(.sRGB) else { return .primary }
+        let brightness = 0.299 * components.redComponent
+                       + 0.587 * components.greenComponent
+                       + 0.114 * components.blueComponent
+        return brightness > 0.5 ? .black : .white
+    }
+
     var hexString: String? {
         guard let components = NSColor(self).usingColorSpace(.sRGB) else { return nil }
         let r = Int(components.redComponent * 255)
