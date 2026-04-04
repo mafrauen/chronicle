@@ -17,16 +17,7 @@ extension Notification.Name {
 struct ToJoApp: App {
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
 
-    @State private var newEntryTrigger = false
-    @State private var showPinnedPane = false
-    @State private var focusTagFieldTrigger = false
-    @State private var searchTrigger = false
-    @State private var pendingEntryTitle: String?
-    @State private var pendingEntryContent: String?
-    @State private var pendingSelectTitle: String?
-    @State private var pendingSelectTag: String?
-    @State private var shouldFocusContent = false
-    @State private var exportTrigger = false
+    @State private var appModel = AppModel()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -44,57 +35,47 @@ struct ToJoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(
-                newEntryTrigger: $newEntryTrigger,
-                showPinnedPane: $showPinnedPane,
-                focusTagFieldTrigger: $focusTagFieldTrigger,
-                searchTrigger: $searchTrigger,
-                pendingEntryTitle: $pendingEntryTitle,
-                pendingEntryContent: $pendingEntryContent,
-                pendingSelectTitle: $pendingSelectTitle,
-                pendingSelectTag: $pendingSelectTag,
-                shouldFocusContent: $shouldFocusContent,
-                exportTrigger: $exportTrigger
-            )
-            .onReceive(NotificationCenter.default.publisher(for: .tojoURLReceived)) { notification in
-                if let url = notification.object as? URL {
-                    handleURL(url)
+            ContentView()
+                .environment(appModel)
+                .onReceive(NotificationCenter.default.publisher(for: .tojoURLReceived)) { notification in
+                    if let url = notification.object as? URL {
+                        handleURL(url)
+                    }
                 }
-            }
-            .handlesExternalEvents(preferring: ["tojo"], allowing: ["*"])
+                .handlesExternalEvents(preferring: ["tojo"], allowing: ["*"])
         }
         .handlesExternalEvents(matching: ["tojo"])
         .modelContainer(sharedModelContainer)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Entry") {
-                    newEntryTrigger.toggle()
+                    appModel.newEntryTrigger.toggle()
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
                 Button("Add Tag") {
-                    focusTagFieldTrigger.toggle()
+                    appModel.focusTagFieldTrigger.toggle()
                 }
                 .keyboardShortcut("t", modifiers: .command)
             }
 
             CommandGroup(after: .sidebar) {
                 Button("Toggle Pinned Pane") {
-                    showPinnedPane.toggle()
+                    appModel.showPinnedPane.toggle()
                 }
                 .keyboardShortcut("d", modifiers: .command)
             }
             
             CommandGroup(after: .textEditing) {
                 Button("Find Entries") {
-                    searchTrigger.toggle()
+                    appModel.searchTrigger.toggle()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
             }
             
             CommandGroup(replacing: .importExport) {
                 Button("Export Entries…") {
-                    exportTrigger.toggle()
+                    appModel.exportTrigger.toggle()
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             }
@@ -111,15 +92,15 @@ struct ToJoApp: App {
         case "new":
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
             let queryItems = components?.queryItems ?? []
-            pendingEntryTitle = queryItems.first(where: { $0.name == "title" })?.value
-            pendingEntryContent = queryItems.first(where: { $0.name == "content" })?.value
-            newEntryTrigger.toggle()
+            appModel.pendingEntryTitle = queryItems.first(where: { $0.name == "title" })?.value
+            appModel.pendingEntryContent = queryItems.first(where: { $0.name == "content" })?.value
+            appModel.newEntryTrigger.toggle()
         case "entry":
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
             let queryItems = components?.queryItems ?? []
-            pendingSelectTag = queryItems.first(where: { $0.name == "tag" })?.value
+            appModel.pendingSelectTag = queryItems.first(where: { $0.name == "tag" })?.value
             if let title = queryItems.first(where: { $0.name == "title" })?.value {
-                pendingSelectTitle = title
+                appModel.pendingSelectTitle = title
             }
         case "open":
             break // showMainWindow already called above

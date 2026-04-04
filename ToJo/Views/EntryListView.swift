@@ -1,0 +1,367 @@
+//
+//  EntryListView.swift
+//  ToJo
+//
+
+import SwiftUI
+import SwiftData
+import UniformTypeIdentifiers
+
+enum DateFilter: String, CaseIterable, Identifiable {
+    case all = "All Time"
+    case last7Days = "Last 7 Days"
+    case last30Days = "Last 30 Days"
+    case last6Months = "Last 6 Months"
+
+    var id: String { rawValue }
+
+    var date: Date? {
+        let calendar = Calendar.current
+        switch self {
+        case .all: return nil
+        case .last7Days: return calendar.date(byAdding: .day, value: -7, to: .now)
+        case .last30Days: return calendar.date(byAdding: .day, value: -30, to: .now)
+        case .last6Months: return calendar.date(byAdding: .month, value: -6, to: .now)
+        }
+    }
+}
+
+struct EntryListView: View {
+    @Environment(AppModel.self) private var appModel
+    let entries: [Entry]
+    @Binding var selectedEntry: Entry?
+    @Binding var firstFilteredEntry: Entry?
+    let onPin: (Entry) -> Void
+    let onNewEntry: () -> Void
+    let onDelete: (Entry) -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Tag.name) private var allTags: [Tag]
+
+    @State private var entryToDelete: Entry?
+    @State private var searchText: String = ""
+    @State private var isSearchPresented = false
+    @State private var selectedTags: Set<PersistentIdentifier> = []
+    @State private var excludedTags: Set<PersistentIdentifier> = []
+    @State private var dateFilter: DateFilter = .all
+    @State private var showFilters = false
+    @State private var showExporter = false
+    @State private var exportDocument: ExportDocument = ExportDocument()
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            List(selection: $selectedEntry) {
+                if showFilters {
+                    Section {
+                        Picker("Date", selection: $dateFilter) {
+                            ForEach(DateFilter.allCases) { filter in
+                                Text(filter.rawValue).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        if !availableTagsForInclude.isEmpty || !selectedTags.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                if !availableTagsForInclude.isEmpty {
+                                    Picker("Include Tag", selection: Binding<PersistentIdentifier?>(
+                                        get: { nil },
+                                        set: { id in
+                                            if let id { selectedTags.insert(id) }
+                                        }
+                                    )) {
+                                        Text("Include tag…").tag(nil as PersistentIdentifier?)
+                                        ForEach(availableTagsForInclude) { tag in
+                                            Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+
+                                ForEach(includedTagObjects) { tag in
+                                    HStack {
+                                        TagBadge(tag: tag)
+                                        Spacer()
+                                        Button {
+                                            selectedTags.remove(tag.persistentModelID)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+
+                        if !availableTagsForExclude.isEmpty || !excludedTags.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                if !availableTagsForExclude.isEmpty {
+                                    Picker("Exclude Tag", selection: Binding<PersistentIdentifier?>(
+                                        get: { nil },
+                                        set: { id in
+                                            if let id { excludedTags.insert(id) }
+                                        }
+                                    )) {
+                                        Text("Exclude tag…").tag(nil as PersistentIdentifier?)
+                                        ForEach(availableTagsForExclude) { tag in
+                                            Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+
+                                ForEach(excludedTagObjects) { tag in
+                                    HStack {
+                                        TagBadge(tag: tag)
+                                        Spacer()
+                                        Button {
+                                            excludedTags.remove(tag.persistentModelID)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+
+                        if !selectedTags.isEmpty || !excludedTags.isEmpty || dateFilter != .all {
+                            Button("Clear Filters") {
+                                selectedTags.removeAll()
+                                excludedTags.removeAll()
+                                dateFilter = .all
+                            }
+                            .font(.caption)
+                        }
+                    } header: {
+                        Text("Filters")
+                    }
+                }
+
+                if let pinnedEntry = filteredPinnedEntry {
+                    Section {
+                        NavigationLink(value: pinnedEntry) {
+                            EntryRowView(entry: pinnedEntry)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                entryToDelete = pinnedEntry
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .contextMenu {
+                            entryContextMenu(for: pinnedEntry)
+                        }
+                    } header: {
+                        Label("Pinned", systemImage: "pin.fill")
+                    }
+                }
+
+                Section {
+                    ForEach(filteredUnpinnedEntries) { entry in
+                        NavigationLink(value: entry) {
+                            EntryRowView(entry: entry)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                entryToDelete = entry
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .contextMenu {
+                            entryContextMenu(for: entry)
+                        }
+                    }
+                } header: {
+                    Text("Entries")
+                }
+            }
+            .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "Filter entries")
+            .onChange(of: appModel.shouldFocusSearch) { oldValue, newValue in
+                if newValue {
+                    if isSearchPresented {
+                        isSearchPresented = false
+                        DispatchQueue.main.async {
+                            isSearchPresented = true
+                        }
+                    } else {
+                        isSearchPresented = true
+                    }
+                    appModel.shouldFocusSearch = false
+                }
+            }
+            .onChange(of: searchText) { oldValue, newValue in
+                if !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                    selectedEntry = nil
+                }
+                updateFirstFilteredEntry()
+            }
+            .onChange(of: selectedTags) { _, _ in
+                updateFirstFilteredEntry()
+            }
+            .onChange(of: excludedTags) { _, _ in
+                updateFirstFilteredEntry()
+            }
+            .onChange(of: dateFilter) { _, _ in
+                updateFirstFilteredEntry()
+            }
+            .onChange(of: appModel.exportTrigger) { _, _ in
+                exportFilteredEntries()
+            }
+            .navigationTitle("ToJo")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        onNewEntry()
+                    } label: {
+                        Label("New Entry", systemImage: "plus")
+                    }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        withAnimation {
+                            showFilters.toggle()
+                        }
+                    } label: {
+                        Label("Filters", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    }
+                    .help("Toggle filters")
+                }
+            }
+            .confirmationDialog(
+                "Delete Entry",
+                isPresented: Binding(
+                    get: { entryToDelete != nil },
+                    set: { if !$0 { entryToDelete = nil } }
+                ),
+                presenting: entryToDelete
+            ) { entry in
+                Button("Delete \"\(entry.title.isEmpty ? "Untitled" : entry.title)\"", role: .destructive) {
+                    onDelete(entry)
+                }
+            } message: { entry in
+                Text("Are you sure you want to delete this entry? This cannot be undone.")
+            }
+            .fileExporter(
+                isPresented: $showExporter,
+                document: exportDocument,
+                contentTypes: [.json, .commaSeparatedText, .plainText],
+                defaultFilename: "ToJo Export"
+            ) { _ in }
+        }
+    }
+
+    @ViewBuilder
+    private func entryContextMenu(for entry: Entry) -> some View {
+        Button {
+            onPin(entry)
+        } label: {
+            Label(entry.isPinned ? "Unpin" : "Pin", systemImage: entry.isPinned ? "pin.slash" : "pin")
+        }
+        Divider()
+        Button(role: .destructive) {
+            entryToDelete = entry
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+    }
+
+    // MARK: - Filtering
+
+    private var isFiltering: Bool {
+        !searchText.trimmingCharacters(in: .whitespaces).isEmpty ||
+        !selectedTags.isEmpty ||
+        !excludedTags.isEmpty ||
+        dateFilter != .all
+    }
+
+    private var filteredPinnedEntry: Entry? {
+        guard let pinnedEntry = entries.first(where: { $0.isPinned }) else { return nil }
+        if !isFiltering { return pinnedEntry }
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            let matchesText = pinnedEntry.title.localizedCaseInsensitiveContains(query) ||
+                pinnedEntry.content.localizedCaseInsensitiveContains(query) ||
+                pinnedEntry.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
+            if !matchesText { return nil }
+        }
+        if !selectedTags.isEmpty {
+            if !pinnedEntry.tags.contains(where: { selectedTags.contains($0.persistentModelID) }) { return nil }
+        }
+        if !excludedTags.isEmpty {
+            if pinnedEntry.tags.contains(where: { excludedTags.contains($0.persistentModelID) }) { return nil }
+        }
+        if let cutoff = dateFilter.date {
+            if pinnedEntry.createdAt < cutoff { return nil }
+        }
+        return pinnedEntry
+    }
+
+    private var availableTagsForInclude: [Tag] {
+        allTags.filter { !selectedTags.contains($0.persistentModelID) && !excludedTags.contains($0.persistentModelID) }
+    }
+
+    private var availableTagsForExclude: [Tag] {
+        allTags.filter { !excludedTags.contains($0.persistentModelID) && !selectedTags.contains($0.persistentModelID) }
+    }
+
+    private var includedTagObjects: [Tag] {
+        allTags.filter { selectedTags.contains($0.persistentModelID) }
+    }
+
+    private var excludedTagObjects: [Tag] {
+        allTags.filter { excludedTags.contains($0.persistentModelID) }
+    }
+
+    private var unpinnedEntries: [Entry] {
+        entries.filter { !$0.isPinned }
+    }
+
+    private var filteredUnpinnedEntries: [Entry] {
+        var result = unpinnedEntries
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            result = result.filter { entry in
+                entry.title.localizedCaseInsensitiveContains(query) ||
+                entry.content.localizedCaseInsensitiveContains(query) ||
+                entry.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
+            }
+        }
+        if !selectedTags.isEmpty {
+            result = result.filter { entry in
+                entry.tags.contains { selectedTags.contains($0.persistentModelID) }
+            }
+        }
+        if !excludedTags.isEmpty {
+            result = result.filter { entry in
+                !entry.tags.contains { excludedTags.contains($0.persistentModelID) }
+            }
+        }
+        if let cutoff = dateFilter.date {
+            result = result.filter { $0.createdAt >= cutoff }
+        }
+        return result
+    }
+
+    private var allFilteredEntries: [Entry] {
+        var result: [Entry] = []
+        if let pinned = filteredPinnedEntry { result.append(pinned) }
+        result.append(contentsOf: filteredUnpinnedEntries)
+        return result
+    }
+
+    private func updateFirstFilteredEntry() {
+        firstFilteredEntry = isFiltering ? (filteredPinnedEntry ?? filteredUnpinnedEntries.first) : nil
+    }
+
+    private func exportFilteredEntries() {
+        guard !allFilteredEntries.isEmpty else { return }
+        exportDocument = ExportDocument(entries: allFilteredEntries)
+        showExporter = true
+    }
+}
