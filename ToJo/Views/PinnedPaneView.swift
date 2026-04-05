@@ -20,7 +20,11 @@ struct PinnedPaneView: View {
             }
             .padding()
             .padding([.bottom], 1.5)
+            #if os(macOS)
             .background(Color(nsColor: .controlBackgroundColor))
+            #else
+            .background(Color(uiColor: .systemBackground))
+            #endif
 
             Divider()
 

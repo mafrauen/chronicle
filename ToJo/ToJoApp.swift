@@ -15,7 +15,9 @@ extension Notification.Name {
 
 @main
 struct ToJoApp: App {
+    #if os(macOS)
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
+    #endif
 
     @State private var appModel = AppModel()
 
@@ -46,6 +48,7 @@ struct ToJoApp: App {
         }
         .handlesExternalEvents(matching: ["tojo"])
         .modelContainer(sharedModelContainer)
+        #if os(macOS)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Entry") {
@@ -65,14 +68,14 @@ struct ToJoApp: App {
                 }
                 .keyboardShortcut("d", modifiers: .command)
             }
-            
+
             CommandGroup(after: .textEditing) {
                 Button("Find Entries") {
                     appModel.searchTrigger.toggle()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
             }
-            
+
             CommandGroup(replacing: .importExport) {
                 Button("Export Entries…") {
                     appModel.exportTrigger.toggle()
@@ -80,14 +83,17 @@ struct ToJoApp: App {
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             }
         }
+        #endif
     }
     
     private func handleURL(_ url: URL) {
+        #if os(macOS)
         AppDelegate.showMainWindow()
-        
+        #endif
+
         guard url.scheme == "tojo" else { return }
         let action = url.host(percentEncoded: false) ?? ""
-        
+
         switch action {
         case "new":
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -103,13 +109,14 @@ struct ToJoApp: App {
                 appModel.pendingSelectTitle = title
             }
         case "open":
-            break // showMainWindow already called above
+            break
         default:
             break
         }
     }
 }
 
+#if os(macOS)
 class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
@@ -117,7 +124,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.post(name: .tojoURLReceived, object: url)
         }
     }
-    
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             AppDelegate.showMainWindow()
@@ -131,7 +138,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.orderFrontRegardless()
         }
         NSApp.activate()
-        // Retry activation after a brief delay to ensure focus when called from URL schemes
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             NSApp.activate()
             if let window = NSApp.windows.first(where: { $0.canBecomeKey }) {
@@ -140,3 +146,4 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 }
+#endif

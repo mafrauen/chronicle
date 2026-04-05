@@ -5,6 +5,11 @@
 
 import SwiftUI
 import SwiftData
+#if canImport(AppKit)
+private let controlBG = controlBG
+#else
+private let controlBG = Color(uiColor: .systemBackground)
+#endif
 
 struct EntryDetailView: View {
     @Environment(AppModel.self) private var appModel
@@ -25,7 +30,7 @@ struct EntryDetailView: View {
                 .textFieldStyle(.plain)
                 .focused($isTitleFocused)
                 .padding()
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background(controlBG)
 
             Divider()
 
@@ -34,7 +39,7 @@ struct EntryDetailView: View {
                 .focused($isContentFocused)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background(controlBG)
                 .onChange(of: entry.content) { oldValue, newValue in
                     entry.lastModifiedAt = Date()
                 }
@@ -84,7 +89,7 @@ struct EntryDetailView: View {
                 }
             }
             .padding()
-            .background(Color(nsColor: .controlBackgroundColor))
+            .background(controlBG)
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

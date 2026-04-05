@@ -4,6 +4,13 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+private typealias PlatformColor = NSColor
+#else
+import UIKit
+private typealias PlatformColor = UIColor
+#endif
 
 extension Color {
     init?(hex: String) {
@@ -30,20 +37,21 @@ extension Color {
         )
     }
 
+    private func rgbaComponents() -> (r: Double, g: Double, b: Double)? {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard PlatformColor(self).getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        return (Double(r), Double(g), Double(b))
+    }
+
     /// Returns `.black` or `.white` — whichever contrasts better with this color.
     var contrastingTextColor: Color {
-        guard let components = NSColor(self).usingColorSpace(.sRGB) else { return .primary }
-        let brightness = 0.299 * components.redComponent
-                       + 0.587 * components.greenComponent
-                       + 0.114 * components.blueComponent
+        guard let c = rgbaComponents() else { return .primary }
+        let brightness = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
         return brightness > 0.5 ? .black : .white
     }
 
     var hexString: String? {
-        guard let components = NSColor(self).usingColorSpace(.sRGB) else { return nil }
-        let r = Int(components.redComponent * 255)
-        let g = Int(components.greenComponent * 255)
-        let b = Int(components.blueComponent * 255)
-        return String(format: "%02X%02X%02X", r, g, b)
+        guard let c = rgbaComponents() else { return nil }
+        return String(format: "%02X%02X%02X", Int(c.r * 255), Int(c.g * 255), Int(c.b * 255))
     }
 }

@@ -21,56 +21,49 @@ struct ContentView: View {
         allEntries.first(where: { $0.isPinned })
     }
 
-    var body: some View {
-        HSplitView {
-            NavigationSplitView {
-                EntryListView(
-                    entries: allEntries,
-                    selectedEntry: $selectedEntry,
-                    firstFilteredEntry: $firstFilteredEntry,
-                    onPin: pinEntry,
-                    onNewEntry: createNewEntry,
-                    onDelete: deleteEntry
+    private var splitView: some View {
+        NavigationSplitView {
+            EntryListView(
+                entries: allEntries,
+                selectedEntry: $selectedEntry,
+                firstFilteredEntry: $firstFilteredEntry,
+                onPin: pinEntry,
+                onNewEntry: createNewEntry,
+                onDelete: deleteEntry
+            )
+        } detail: {
+            if let entry = selectedEntry {
+                EntryDetailView(
+                    entry: entry,
+                    onPin: {
+                        pinEntry(entry)
+                    }
                 )
-            } detail: {
-                if let entry = selectedEntry {
-                    EntryDetailView(
-                        entry: entry,
-                        onPin: {
-                            pinEntry(entry)
-                        }
-                    )
-                } else if let fallbackEntry = firstFilteredEntry ?? pinnedEntry ?? allEntries.first {
-                    EntryDetailView(
-                        entry: fallbackEntry,
-                        onPin: {
-                            pinEntry(fallbackEntry)
-                        }
-                    )
-                } else {
-                    ContentUnavailableView(
-                        "No Entries",
-                        systemImage: "book.closed",
-                        description: Text("Create your first entry to get started")
-                    )
-                }
-            }
-
-            if appModel.showPinnedPane, let pinned = pinnedEntry {
-                PinnedPaneView(entry: pinned)
-                    .frame(minWidth: 250, idealWidth: 300)
+            } else if let fallbackEntry = firstFilteredEntry ?? pinnedEntry ?? allEntries.first {
+                EntryDetailView(
+                    entry: fallbackEntry,
+                    onPin: {
+                        pinEntry(fallbackEntry)
+                    }
+                )
+            } else {
+                ContentUnavailableView(
+                    "No Entries",
+                    systemImage: "book.closed",
+                    description: Text("Create your first entry to get started")
+                )
             }
         }
-        .onChange(of: appModel.newEntryTrigger) { oldValue, newValue in
+        .onChange(of: appModel.newEntryTrigger) { _, _ in
             createNewEntry()
         }
-        .onChange(of: appModel.focusTagFieldTrigger) { oldValue, newValue in
+        .onChange(of: appModel.focusTagFieldTrigger) { _, _ in
             appModel.shouldFocusTagField = true
         }
-        .onChange(of: appModel.searchTrigger) { oldValue, newValue in
+        .onChange(of: appModel.searchTrigger) { _, _ in
             appModel.shouldFocusSearch = true
         }
-        .onChange(of: appModel.pendingSelectTitle) { oldValue, newValue in
+        .onChange(of: appModel.pendingSelectTitle) { _, newValue in
             guard let title = newValue else { return }
             if let existing = allEntries.first(where: { $0.title == title }) {
                 selectedEntry = existing
@@ -92,6 +85,20 @@ struct ContentView: View {
                 appModel.shouldFocusContent = true
             }
         }
+    }
+
+    var body: some View {
+        #if os(macOS)
+        HSplitView {
+            splitView
+            if appModel.showPinnedPane, let pinned = pinnedEntry {
+                PinnedPaneView(entry: pinned)
+                    .frame(minWidth: 250, idealWidth: 300)
+            }
+        }
+        #else
+        splitView
+        #endif
     }
 
     private func createNewEntry() {
