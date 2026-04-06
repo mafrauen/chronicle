@@ -12,7 +12,11 @@ struct TagBadge: View {
         Text(tag.name)
             .font(.caption)
             .padding(.horizontal, 8)
+            #if os(iOS)
+            .padding(.vertical, 3)
+            #else
             .padding(.vertical, 2)
+            #endif
             .background(tagColor.opacity(0.6))
             .foregroundStyle(tagColor.contrastingTextColor)
             .clipShape(Capsule())
@@ -54,7 +58,11 @@ struct RemovableTagBadge: View {
         }
         .padding(.leading, 8)
         .padding(.trailing, 6)
+        #if os(iOS)
+        .padding(.vertical, 3)
+        #else
         .padding(.vertical, 2)
+        #endif
         .background(tagColor.opacity(0.6))
         .foregroundStyle(tagColor.contrastingTextColor)
         .clipShape(Capsule())

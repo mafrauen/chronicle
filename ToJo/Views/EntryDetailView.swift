@@ -55,7 +55,13 @@ struct EntryDetailView: View {
                         showingTagPicker = true
                     } label: {
                         Image(systemName: "tag")
+                            #if os(iOS)
+                            .font(.body)
+                            .padding(10)
+                            .contentShape(Rectangle())
+                            #else
                             .font(.caption)
+                            #endif
                     }
                     .buttonStyle(.borderless)
                     .help("Browse all tags")
