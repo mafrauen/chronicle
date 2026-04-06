@@ -39,7 +39,12 @@ extension Color {
 
     private func rgbaComponents() -> (r: Double, g: Double, b: Double)? {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        #if os(macOS)
+        guard let converted = PlatformColor(self).usingColorSpace(.sRGB) else { return nil }
+        converted.getRed(&r, green: &g, blue: &b, alpha: &a)
+        #else
         guard PlatformColor(self).getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        #endif
         return (Double(r), Double(g), Double(b))
     }
 

@@ -6,7 +6,7 @@
 import SwiftUI
 import SwiftData
 #if canImport(AppKit)
-private let controlBG = controlBG
+private let controlBG = Color(nsColor: .controlBackgroundColor)
 #else
 private let controlBG = Color(uiColor: .systemBackground)
 #endif

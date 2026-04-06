@@ -12,16 +12,18 @@ enum DateFilter: String, CaseIterable, Identifiable {
     case last7Days = "Last 7 Days"
     case last30Days = "Last 30 Days"
     case last6Months = "Last 6 Months"
+    case custom = "Custom Date"
 
     var id: String { rawValue }
 
-    var date: Date? {
+    var presetDate: Date? {
         let calendar = Calendar.current
         switch self {
         case .all: return nil
         case .last7Days: return calendar.date(byAdding: .day, value: -7, to: .now)
         case .last30Days: return calendar.date(byAdding: .day, value: -30, to: .now)
         case .last6Months: return calendar.date(byAdding: .month, value: -6, to: .now)
+        case .custom: return nil
         }
     }
 }
@@ -44,6 +46,7 @@ struct EntryListView: View {
     @State private var selectedTags: Set<PersistentIdentifier> = []
     @State private var excludedTags: Set<PersistentIdentifier> = []
     @State private var dateFilter: DateFilter = .all
+    @State private var customStartDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
     @State private var showFilters = false
     @State private var showExporter = false
     @State private var exportDocument: ExportDocument = ExportDocument()
@@ -59,6 +62,15 @@ struct EntryListView: View {
                             }
                         }
                         .pickerStyle(.menu)
+
+                        if dateFilter == .custom {
+                            DatePicker(
+                                "From",
+                                selection: $customStartDate,
+                                in: ...Date.now,
+                                displayedComponents: .date
+                            )
+                        }
 
                         if !availableTagsForInclude.isEmpty || !selectedTags.isEmpty {
                             VStack(alignment: .leading, spacing: 4) {
@@ -133,6 +145,7 @@ struct EntryListView: View {
                                 selectedTags.removeAll()
                                 excludedTags.removeAll()
                                 dateFilter = .all
+                                customStartDate = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
                             }
                             .font(.caption)
                         }
@@ -210,6 +223,9 @@ struct EntryListView: View {
             .onChange(of: dateFilter) { _, _ in
                 updateFirstFilteredEntry()
             }
+            .onChange(of: customStartDate) { _, _ in
+                updateFirstFilteredEntry()
+            }
             .onChange(of: appModel.exportTrigger) { _, _ in
                 exportFilteredEntries()
             }
@@ -273,6 +289,10 @@ struct EntryListView: View {
 
     // MARK: - Filtering
 
+    private var effectiveCutoffDate: Date? {
+        dateFilter == .custom ? customStartDate : dateFilter.presetDate
+    }
+
     private var isFiltering: Bool {
         !searchText.trimmingCharacters(in: .whitespaces).isEmpty ||
         !selectedTags.isEmpty ||
@@ -296,7 +316,7 @@ struct EntryListView: View {
         if !excludedTags.isEmpty {
             if pinnedEntry.tags.contains(where: { excludedTags.contains($0.persistentModelID) }) { return nil }
         }
-        if let cutoff = dateFilter.date {
+        if let cutoff = effectiveCutoffDate {
             if pinnedEntry.createdAt < cutoff { return nil }
         }
         return pinnedEntry
@@ -342,7 +362,7 @@ struct EntryListView: View {
                 !entry.tags.contains { excludedTags.contains($0.persistentModelID) }
             }
         }
-        if let cutoff = dateFilter.date {
+        if let cutoff = effectiveCutoffDate {
             result = result.filter { $0.createdAt >= cutoff }
         }
         return result
