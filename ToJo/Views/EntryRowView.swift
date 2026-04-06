@@ -34,8 +34,8 @@ struct EntryRowView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
 
-                if !entry.tags.isEmpty {
-                    ForEach(entry.tags) { tag in
+                if !entry.tagList.isEmpty {
+                    ForEach(entry.tagList) { tag in
                         TagBadge(tag: tag)
                     }
                 }

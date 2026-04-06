@@ -75,7 +75,7 @@ struct ContentView: View {
                     if tag.modelContext == nil {
                         modelContext.insert(tag)
                     }
-                    newEntry.tags.append(tag)
+                    newEntry.tags?.append(tag)
                 }
                 selectedEntry = newEntry
             }

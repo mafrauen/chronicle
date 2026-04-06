@@ -69,8 +69,8 @@ struct TagPickerView: View {
             // Tag list
             List {
                 ForEach(filteredTags) { tag in
-                    TagPickerRow(tag: tag, isAdded: entry.tags.contains(tag)) {
-                        if entry.tags.contains(tag) {
+                    TagPickerRow(tag: tag, isAdded: entry.tagList.contains(tag)) {
+                        if entry.tagList.contains(tag) {
                             removeTag(tag)
                         } else {
                             addTag(tag)
@@ -107,7 +107,7 @@ struct TagPickerView: View {
         guard !query.isEmpty else { return }
 
         if let first = filteredTags.first {
-            if !entry.tags.contains(first) {
+            if !entry.tagList.contains(first) {
                 addTag(first)
             }
         } else {
@@ -117,14 +117,14 @@ struct TagPickerView: View {
     }
 
     private func removeTag(_ tag: Tag) {
-        if let index = entry.tags.firstIndex(of: tag) {
-            entry.tags.remove(at: index)
+        if let index = entry.tags?.firstIndex(of: tag) {
+            entry.tags?.remove(at: index)
         }
     }
 
     private func addTag(_ tag: Tag) {
-        if !entry.tags.contains(tag) {
-            entry.tags.append(tag)
+        if !entry.tagList.contains(tag) {
+            entry.tags?.append(tag)
         }
     }
 
@@ -133,13 +133,13 @@ struct TagPickerView: View {
         guard !name.isEmpty else { return }
         let newTag = Tag(name: name)
         modelContext.insert(newTag)
-        entry.tags.append(newTag)
+        entry.tags?.append(newTag)
         searchText = ""
     }
 
     private func deleteTag(_ tag: Tag) {
-        if let index = entry.tags.firstIndex(of: tag) {
-            entry.tags.remove(at: index)
+        if let index = entry.tags?.firstIndex(of: tag) {
+            entry.tags?.remove(at: index)
         }
         modelContext.delete(tag)
     }

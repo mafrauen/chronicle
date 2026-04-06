@@ -15,24 +15,26 @@ import SwiftData
 @Model
 final class Entry {
     /// The title of the entry
-    var title: String
-    
+    var title: String = ""
+
     /// The main content of the entry
-    var content: String
-    
+    var content: String = ""
+
     /// When this entry was created
-    var createdAt: Date
-    
+    var createdAt: Date = Date()
+
     /// When this entry was last modified
-    var lastModifiedAt: Date
-    
+    var lastModifiedAt: Date = Date()
+
     /// Whether this entry is pinned (only one can be pinned at a time)
-    var isPinned: Bool
-    
+    var isPinned: Bool = false
+
     /// Tags associated with this entry
     @Relationship(deleteRule: .nullify, inverse: \Tag.entries)
-    var tags: [Tag]
-    
+    var tags: [Tag]?
+
+    var tagList: [Tag] { tags ?? [] }
+
     init(title: String = "", content: String = "", createdAt: Date = Date(), isPinned: Bool = false) {
         self.title = title
         self.content = content
@@ -49,22 +51,21 @@ final class Entry {
 @Model
 final class Tag {
     /// The name of the tag
-    var name: String
-    
+    var name: String = ""
+
     /// Optional color for visual distinction (stored as hex string)
     var colorHex: String?
-    
+
     /// Entries associated with this tag
     @Relationship(deleteRule: .nullify)
-    var entries: [Entry]
-    
+    var entries: [Entry]?
+
     /// When this tag was created
-    var createdAt: Date
-    
+    var createdAt: Date = Date()
+
     init(name: String, colorHex: String? = nil) {
         self.name = name
         self.colorHex = colorHex
-        self.createdAt = Date()
         self.entries = []
     }
 }

@@ -56,7 +56,7 @@ enum EntryExporter {
         for entry in entries {
             let title = entry.title.replacingOccurrences(of: "\"", with: "\"\"")
             let content = entry.content.replacingOccurrences(of: "\"", with: "\"\"")
-            let tags = entry.tags.map { $0.name.replacingOccurrences(of: ";", with: "\\;") }.joined(separator: "; ")
+            let tags = entry.tagList.map { $0.name.replacingOccurrences(of: ";", with: "\\;") }.joined(separator: "; ")
             let created = ISO8601DateFormatter().string(from: entry.createdAt)
             let modified = ISO8601DateFormatter().string(from: entry.lastModifiedAt)
             lines.append("\"\(title)\",\"\(content)\",\"\(tags)\",\"\(created)\",\"\(modified)\"")
@@ -69,7 +69,7 @@ enum EntryExporter {
             [
                 "title": entry.title,
                 "content": entry.content,
-                "tags": entry.tags.map(\.name),
+                "tags": entry.tagList.map(\.name),
                 "created": ISO8601DateFormatter().string(from: entry.createdAt),
                 "modified": ISO8601DateFormatter().string(from: entry.lastModifiedAt),
                 "pinned": entry.isPinned
@@ -88,8 +88,8 @@ enum EntryExporter {
             var parts: [String] = []
             parts.append(entry.title.isEmpty ? "Untitled" : entry.title)
             parts.append("Created: \(ISO8601DateFormatter().string(from: entry.createdAt))")
-            if !entry.tags.isEmpty {
-                parts.append("Tags: \(entry.tags.map(\.name).joined(separator: ", "))")
+            if !entry.tagList.isEmpty {
+                parts.append("Tags: \(entry.tagList.map(\.name).joined(separator: ", "))")
             }
             if !entry.content.isEmpty {
                 parts.append("")

@@ -69,10 +69,10 @@ struct EntryDetailView: View {
                         TagPickerView(entry: entry, allTags: allTags)
                     }
 
-                    if !entry.tags.isEmpty {
+                    if !entry.tagList.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
-                                ForEach(entry.tags) { tag in
+                                ForEach(entry.tagList) { tag in
                                     RemovableTagBadge(tag: tag) {
                                         removeTag(tag)
                                     }
@@ -127,8 +127,8 @@ struct EntryDetailView: View {
     }
 
     private func removeTag(_ tag: Tag) {
-        if let index = entry.tags.firstIndex(of: tag) {
-            entry.tags.remove(at: index)
+        if let index = entry.tags?.firstIndex(of: tag) {
+            entry.tags?.remove(at: index)
         }
     }
 }

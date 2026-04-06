@@ -307,14 +307,14 @@ struct EntryListView: View {
         if !query.isEmpty {
             let matchesText = pinnedEntry.title.localizedCaseInsensitiveContains(query) ||
                 pinnedEntry.content.localizedCaseInsensitiveContains(query) ||
-                pinnedEntry.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
+                pinnedEntry.tagList.contains { $0.name.localizedCaseInsensitiveContains(query) }
             if !matchesText { return nil }
         }
         if !selectedTags.isEmpty {
-            if !pinnedEntry.tags.contains(where: { selectedTags.contains($0.persistentModelID) }) { return nil }
+            if !pinnedEntry.tagList.contains(where: { selectedTags.contains($0.persistentModelID) }) { return nil }
         }
         if !excludedTags.isEmpty {
-            if pinnedEntry.tags.contains(where: { excludedTags.contains($0.persistentModelID) }) { return nil }
+            if pinnedEntry.tagList.contains(where: { excludedTags.contains($0.persistentModelID) }) { return nil }
         }
         if let cutoff = effectiveCutoffDate {
             if pinnedEntry.createdAt < cutoff { return nil }
@@ -349,17 +349,17 @@ struct EntryListView: View {
             result = result.filter { entry in
                 entry.title.localizedCaseInsensitiveContains(query) ||
                 entry.content.localizedCaseInsensitiveContains(query) ||
-                entry.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
+                entry.tagList.contains { $0.name.localizedCaseInsensitiveContains(query) }
             }
         }
         if !selectedTags.isEmpty {
             result = result.filter { entry in
-                entry.tags.contains { selectedTags.contains($0.persistentModelID) }
+                entry.tagList.contains { selectedTags.contains($0.persistentModelID) }
             }
         }
         if !excludedTags.isEmpty {
             result = result.filter { entry in
-                !entry.tags.contains { excludedTags.contains($0.persistentModelID) }
+                !entry.tagList.contains { excludedTags.contains($0.persistentModelID) }
             }
         }
         if let cutoff = effectiveCutoffDate {
