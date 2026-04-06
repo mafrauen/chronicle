@@ -49,7 +49,7 @@ final class Entry {
 @Model
 final class Tag {
     /// The name of the tag
-    @Attribute(.unique) var name: String
+    var name: String
     
     /// Optional color for visual distinction (stored as hex string)
     var colorHex: String?
