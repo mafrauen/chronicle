@@ -53,222 +53,98 @@ struct EntryListView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            List(selection: $selectedEntry) {
-                if showFilters {
-                    Section {
-                        Picker("Date", selection: $dateFilter) {
-                            ForEach(DateFilter.allCases) { filter in
-                                Text(filter.rawValue).tag(filter)
-                            }
-                        }
-                        .pickerStyle(.menu)
+            entryList
+        }
+    }
 
-                        if dateFilter == .custom {
-                            DatePicker(
-                                "From",
-                                selection: $customStartDate,
-                                in: ...Date.now,
-                                displayedComponents: .date
-                            )
-                        }
+    private var entryList: some View {
+        List(selection: $selectedEntry) {
+            if showFilters { filterSection }
+            if let pinnedEntry = filteredPinnedEntry { pinnedSection(pinnedEntry) }
+            unpinnedSection
+        }
+        .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "Filter entries")
+        .onChange(of: appModel.shouldFocusSearch) { _, newValue in
+            guard newValue else { return }
+            if isSearchPresented {
+                isSearchPresented = false
+                DispatchQueue.main.async { isSearchPresented = true }
+            } else {
+                isSearchPresented = true
+            }
+            appModel.shouldFocusSearch = false
+        }
+        .onChange(of: searchText) { _, newValue in
+            if !newValue.trimmingCharacters(in: .whitespaces).isEmpty { selectedEntry = nil }
+            updateFirstFilteredEntry()
+        }
+        .onChange(of: selectedTags) { _, _ in updateFirstFilteredEntry() }
+        .onChange(of: excludedTags) { _, _ in updateFirstFilteredEntry() }
+        .onChange(of: dateFilter) { _, _ in updateFirstFilteredEntry() }
+        .onChange(of: customStartDate) { _, _ in updateFirstFilteredEntry() }
+        .onChange(of: appModel.exportTrigger) { _, _ in exportFilteredEntries() }
+        #if os(iOS)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        #else
+        .navigationTitle("ToJo")
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { onNewEntry() } label: { Label("New Entry", systemImage: "plus") }
+            }
+            ToolbarItem(placement: .automatic) {
+                Button { withAnimation { showFilters.toggle() } } label: {
+                    Label("Filters", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                }
+                .help("Toggle filters")
+            }
+        }
+        .confirmationDialog(
+            "Delete Entry",
+            isPresented: Binding(get: { entryToDelete != nil }, set: { if !$0 { entryToDelete = nil } }),
+            presenting: entryToDelete
+        ) { entry in
+            Button("Delete \"\(entry.title.isEmpty ? "Untitled" : entry.title)\"", role: .destructive) { onDelete(entry) }
+        } message: { entry in
+            Text("Are you sure you want to delete this entry? This cannot be undone.")
+        }
+        .fileExporter(
+            isPresented: $showExporter,
+            document: exportDocument,
+            contentTypes: [.json, .commaSeparatedText, .plainText],
+            defaultFilename: "ToJo Export"
+        ) { _ in }
+    }
 
-                        if !availableTagsForInclude.isEmpty || !selectedTags.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                if !availableTagsForInclude.isEmpty {
-                                    Picker("Include Tag", selection: Binding<PersistentIdentifier?>(
-                                        get: { nil },
-                                        set: { id in
-                                            if let id { selectedTags.insert(id) }
-                                        }
-                                    )) {
-                                        Text("Include tag…").tag(nil as PersistentIdentifier?)
-                                        ForEach(availableTagsForInclude) { tag in
-                                            Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
-                                        }
-                                    }
-                                    .pickerStyle(.menu)
-                                }
-
-                                ForEach(includedTagObjects) { tag in
-                                    HStack {
-                                        TagBadge(tag: tag)
-                                        Spacer()
-                                        Button {
-                                            selectedTags.remove(tag.persistentModelID)
-                                        } label: {
-                                            Image(systemName: "xmark")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                            }
-                        }
-
-                        if !availableTagsForExclude.isEmpty || !excludedTags.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                if !availableTagsForExclude.isEmpty {
-                                    Picker("Exclude Tag", selection: Binding<PersistentIdentifier?>(
-                                        get: { nil },
-                                        set: { id in
-                                            if let id { excludedTags.insert(id) }
-                                        }
-                                    )) {
-                                        Text("Exclude tag…").tag(nil as PersistentIdentifier?)
-                                        ForEach(availableTagsForExclude) { tag in
-                                            Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
-                                        }
-                                    }
-                                    .pickerStyle(.menu)
-                                }
-
-                                ForEach(excludedTagObjects) { tag in
-                                    HStack {
-                                        TagBadge(tag: tag)
-                                        Spacer()
-                                        Button {
-                                            excludedTags.remove(tag.persistentModelID)
-                                        } label: {
-                                            Image(systemName: "xmark")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                            }
-                        }
-
-                        if !selectedTags.isEmpty || !excludedTags.isEmpty || dateFilter != .all {
-                            Button("Clear Filters") {
-                                selectedTags.removeAll()
-                                excludedTags.removeAll()
-                                dateFilter = .all
-                                customStartDate = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
-                            }
-                            .font(.caption)
-                        }
-                    } header: {
-                        Text("Filters")
+    @ViewBuilder
+    private func pinnedSection(_ pinnedEntry: Entry) -> some View {
+        Section {
+            NavigationLink(value: pinnedEntry) { EntryRowView(entry: pinnedEntry) }
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { onDelete(pinnedEntry) } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
+                .contextMenu { entryContextMenu(for: pinnedEntry) }
+        } header: {
+            Label("Pinned", systemImage: "pin.fill")
+        }
+    }
 
-                if let pinnedEntry = filteredPinnedEntry {
-                    Section {
-                        NavigationLink(value: pinnedEntry) {
-                            EntryRowView(entry: pinnedEntry)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                onDelete(pinnedEntry)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                        .contextMenu {
-                            entryContextMenu(for: pinnedEntry)
-                        }
-                    } header: {
-                        Label("Pinned", systemImage: "pin.fill")
-                    }
-                }
-
-                Section {
-                    ForEach(filteredUnpinnedEntries) { entry in
-                        NavigationLink(value: entry) {
-                            EntryRowView(entry: entry)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                onDelete(entry)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                        .contextMenu {
-                            entryContextMenu(for: entry)
+    private var unpinnedSection: some View {
+        Section {
+            ForEach(filteredUnpinnedEntries) { entry in
+                NavigationLink(value: entry) { EntryRowView(entry: entry) }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { onDelete(entry) } label: {
+                            Label("Delete", systemImage: "trash")
                         }
                     }
-                } header: {
-                    Text("Entries")
-                }
+                    .contextMenu { entryContextMenu(for: entry) }
             }
-            .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "Filter entries")
-            .onChange(of: appModel.shouldFocusSearch) { oldValue, newValue in
-                if newValue {
-                    if isSearchPresented {
-                        isSearchPresented = false
-                        DispatchQueue.main.async {
-                            isSearchPresented = true
-                        }
-                    } else {
-                        isSearchPresented = true
-                    }
-                    appModel.shouldFocusSearch = false
-                }
-            }
-            .onChange(of: searchText) { oldValue, newValue in
-                if !newValue.trimmingCharacters(in: .whitespaces).isEmpty {
-                    selectedEntry = nil
-                }
-                updateFirstFilteredEntry()
-            }
-            .onChange(of: selectedTags) { _, _ in
-                updateFirstFilteredEntry()
-            }
-            .onChange(of: excludedTags) { _, _ in
-                updateFirstFilteredEntry()
-            }
-            .onChange(of: dateFilter) { _, _ in
-                updateFirstFilteredEntry()
-            }
-            .onChange(of: customStartDate) { _, _ in
-                updateFirstFilteredEntry()
-            }
-            .onChange(of: appModel.exportTrigger) { _, _ in
-                exportFilteredEntries()
-            }
-            .navigationTitle("ToJo")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        onNewEntry()
-                    } label: {
-                        Label("New Entry", systemImage: "plus")
-                    }
-                }
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        withAnimation {
-                            showFilters.toggle()
-                        }
-                    } label: {
-                        Label("Filters", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                    }
-                    .help("Toggle filters")
-                }
-            }
-            .confirmationDialog(
-                "Delete Entry",
-                isPresented: Binding(
-                    get: { entryToDelete != nil },
-                    set: { if !$0 { entryToDelete = nil } }
-                ),
-                presenting: entryToDelete
-            ) { entry in
-                Button("Delete \"\(entry.title.isEmpty ? "Untitled" : entry.title)\"", role: .destructive) {
-                    onDelete(entry)
-                }
-            } message: { entry in
-                Text("Are you sure you want to delete this entry? This cannot be undone.")
-            }
-            .fileExporter(
-                isPresented: $showExporter,
-                document: exportDocument,
-                contentTypes: [.json, .commaSeparatedText, .plainText],
-                defaultFilename: "ToJo Export"
-            ) { _ in }
+        } header: {
+            Text("Entries")
         }
     }
 
@@ -284,6 +160,95 @@ struct EntryListView: View {
             entryToDelete = entry
         } label: {
             Label("Delete", systemImage: "trash")
+        }
+    }
+
+    // MARK: - Filter Section
+
+    @ViewBuilder
+    private var filterSection: some View {
+        Section {
+            Picker("Date", selection: $dateFilter) {
+                ForEach(DateFilter.allCases) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+            .pickerStyle(.menu)
+
+            if dateFilter == .custom {
+                DatePicker(
+                    "From",
+                    selection: $customStartDate,
+                    in: ...Date.now,
+                    displayedComponents: .date
+                )
+            }
+
+            if !availableTagsForInclude.isEmpty || !selectedTags.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    if !availableTagsForInclude.isEmpty {
+                        Picker("Include Tag", selection: Binding<PersistentIdentifier?>(
+                            get: { nil },
+                            set: { id in if let id { selectedTags.insert(id) } }
+                        )) {
+                            Text("Include tag…").tag(nil as PersistentIdentifier?)
+                            ForEach(availableTagsForInclude) { tag in
+                                Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    ForEach(includedTagObjects) { tag in
+                        HStack {
+                            TagBadge(tag: tag)
+                            Spacer()
+                            Button { selectedTags.remove(tag.persistentModelID) } label: {
+                                Image(systemName: "xmark").font(.caption2).foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            if !availableTagsForExclude.isEmpty || !excludedTags.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    if !availableTagsForExclude.isEmpty {
+                        Picker("Exclude Tag", selection: Binding<PersistentIdentifier?>(
+                            get: { nil },
+                            set: { id in if let id { excludedTags.insert(id) } }
+                        )) {
+                            Text("Exclude tag…").tag(nil as PersistentIdentifier?)
+                            ForEach(availableTagsForExclude) { tag in
+                                Text(tag.name).tag(tag.persistentModelID as PersistentIdentifier?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    ForEach(excludedTagObjects) { tag in
+                        HStack {
+                            TagBadge(tag: tag)
+                            Spacer()
+                            Button { excludedTags.remove(tag.persistentModelID) } label: {
+                                Image(systemName: "xmark").font(.caption2).foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            if !selectedTags.isEmpty || !excludedTags.isEmpty || dateFilter != .all {
+                Button("Clear Filters") {
+                    selectedTags.removeAll()
+                    excludedTags.removeAll()
+                    dateFilter = .all
+                    customStartDate = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+                }
+                .font(.caption)
+            }
+        } header: {
+            Text("Filters")
         }
     }
 
