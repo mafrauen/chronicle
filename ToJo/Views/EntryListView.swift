@@ -128,7 +128,7 @@ struct EntryListView: View {
                 }
                 .contextMenu { entryContextMenu(for: pinnedEntry) }
         } header: {
-            Label("Pinned", systemImage: "pin.fill")
+            Text("Pinned")
         }
     }
 
