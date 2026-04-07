@@ -32,6 +32,22 @@ struct TagPickerView: View {
     }
 
     var body: some View {
+        #if os(iOS)
+        NavigationStack {
+            tagList
+                .navigationTitle("Tags")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+                .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search tags…")
+                .onSubmit(of: .search) { handleSubmit() }
+        }
+        .presentationDetents([.medium, .large])
+        .onAppear { isSearchFocused = true }
+        #else
         VStack(spacing: 0) {
             // Search field
             HStack {
@@ -40,9 +56,7 @@ struct TagPickerView: View {
                 TextField("Search tags…", text: $searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
-                    .onSubmit {
-                        handleSubmit()
-                    }
+                    .onSubmit { handleSubmit() }
 
                 if !searchText.isEmpty {
                     Button {
@@ -66,39 +80,40 @@ struct TagPickerView: View {
 
             Divider()
 
-            // Tag list
-            List {
-                ForEach(filteredTags) { tag in
-                    TagPickerRow(tag: tag, isAdded: entry.tagList.contains(tag)) {
-                        if entry.tagList.contains(tag) {
-                            removeTag(tag)
-                        } else {
-                            addTag(tag)
-                        }
-                    } onDelete: {
-                        deleteTag(tag)
-                    }
-                }
-
-                // "Create" row when search text doesn't match an existing tag
-                if !queryIsEmpty && !exactMatchExists {
-                    Button {
-                        createAndAddTag()
-                    } label: {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(.green)
-                            Text("Create \"\(searchText.trimmingCharacters(in: .whitespaces))\"")
-                            Spacer()
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+            tagList
         }
         .frame(width: 320, height: 350)
-        .onAppear {
-            isSearchFocused = true
+        .onAppear { isSearchFocused = true }
+        #endif
+    }
+
+    private var tagList: some View {
+        List {
+            ForEach(filteredTags) { tag in
+                TagPickerRow(tag: tag, isAdded: entry.tagList.contains(tag)) {
+                    if entry.tagList.contains(tag) {
+                        removeTag(tag)
+                    } else {
+                        addTag(tag)
+                    }
+                } onDelete: {
+                    deleteTag(tag)
+                }
+            }
+
+            if !queryIsEmpty && !exactMatchExists {
+                Button {
+                    createAndAddTag()
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Create \"\(searchText.trimmingCharacters(in: .whitespaces))\"")
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
