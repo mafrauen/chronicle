@@ -99,6 +99,14 @@ struct EntryListView: View {
                 }
                 .help("Toggle filters")
             }
+            #if os(iOS)
+            ToolbarItem(placement: .automatic) {
+                Button { exportFilteredEntries() } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+                .disabled(allFilteredEntries.isEmpty)
+            }
+            #endif
         }
         .confirmationDialog(
             "Delete Entry",
