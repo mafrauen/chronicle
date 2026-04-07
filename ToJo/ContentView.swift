@@ -106,7 +106,7 @@ struct ContentView: View {
     }
 
     private func createNewEntry() {
-        let title = appModel.pendingEntryTitle ?? "New Entry"
+        let title = appModel.pendingEntryTitle ?? ""
         let content = appModel.pendingEntryContent ?? ""
         let newEntry = Entry(title: title, content: content)
         modelContext.insert(newEntry)
