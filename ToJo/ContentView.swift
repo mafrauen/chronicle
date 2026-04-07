@@ -73,6 +73,11 @@ struct ContentView: View {
             guard let title = newValue else { return }
             if let existing = allEntries.first(where: { $0.title == title }) {
                 selectedEntry = existing
+                if let tagName = appModel.pendingSelectTag {
+                    let tag = allTags.first(where: { $0.name == tagName }) ?? Tag(name: tagName)
+                    if tag.modelContext == nil { modelContext.insert(tag) }
+                    if !(existing.tagList.contains(tag)) { existing.tags?.append(tag) }
+                }
             } else {
                 let newEntry = Entry(title: title)
                 modelContext.insert(newEntry)
