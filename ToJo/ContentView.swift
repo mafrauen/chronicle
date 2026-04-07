@@ -11,6 +11,7 @@ import SwiftData
 struct ContentView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.undoManager) private var undoManager
     @Query(sort: \Entry.createdAt, order: .reverse) private var allEntries: [Entry]
     @Query(sort: \Tag.name) private var allTags: [Tag]
 
@@ -84,6 +85,9 @@ struct ContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 appModel.shouldFocusContent = true
             }
+        }
+        .task {
+            modelContext.undoManager = undoManager
         }
     }
 

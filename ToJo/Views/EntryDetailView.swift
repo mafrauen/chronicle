@@ -106,6 +106,12 @@ struct EntryDetailView: View {
                 }
             }
         }
+        .onAppear {
+            if appModel.shouldFocusTitle {
+                isTitleFocused = true
+                appModel.shouldFocusTitle = false
+            }
+        }
         .onChange(of: appModel.shouldFocusTitle) { oldValue, newValue in
             if newValue {
                 isTitleFocused = true

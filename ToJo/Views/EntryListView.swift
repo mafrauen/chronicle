@@ -161,7 +161,7 @@ struct EntryListView: View {
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
-                                entryToDelete = pinnedEntry
+                                onDelete(pinnedEntry)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -181,7 +181,7 @@ struct EntryListView: View {
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
-                                entryToDelete = entry
+                                onDelete(entry)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
