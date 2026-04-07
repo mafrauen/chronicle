@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Xcode user state
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Build artifacts
+DerivedData/
+build/
+*.o
+*.d
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
