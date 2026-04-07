@@ -110,6 +110,10 @@ struct EntryDetailView: View {
             if appModel.shouldFocusTitle {
                 isTitleFocused = true
                 appModel.shouldFocusTitle = false
+            } else {
+                #if os(macOS)
+                isContentFocused = true
+                #endif
             }
         }
         .onChange(of: appModel.shouldFocusTitle) { oldValue, newValue in
