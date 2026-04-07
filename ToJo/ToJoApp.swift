@@ -108,7 +108,11 @@ struct ToJoApp: App {
                 appModel.pendingSelectTitle = title
             }
         case "open":
-            break
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let queryItems = components?.queryItems ?? []
+            if queryItems.contains(where: { $0.name == "pinned" }) {
+                appModel.pendingSelectPinned = true
+            }
         default:
             break
         }

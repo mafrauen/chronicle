@@ -64,6 +64,11 @@ struct ContentView: View {
         .onChange(of: appModel.searchTrigger) { _, _ in
             appModel.shouldFocusSearch = true
         }
+        .onChange(of: appModel.pendingSelectPinned) { _, newValue in
+            guard newValue else { return }
+            selectedEntry = allEntries.first(where: { $0.isPinned })
+            appModel.pendingSelectPinned = false
+        }
         .onChange(of: appModel.pendingSelectTitle) { _, newValue in
             guard let title = newValue else { return }
             if let existing = allEntries.first(where: { $0.title == title }) {

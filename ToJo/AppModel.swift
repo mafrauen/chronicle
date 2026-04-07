@@ -18,6 +18,7 @@ final class AppModel {
     // MARK: - Entry selection via URL
     var pendingSelectTitle: String?
     var pendingSelectTag: String?
+    var pendingSelectPinned = false
 
     // MARK: - UI toggles
     var showPinnedPane = false
