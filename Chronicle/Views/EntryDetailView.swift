@@ -25,7 +25,10 @@ struct EntryDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Entry Title", text: $entry.title)
+            TextField("Entry Title", text: Binding(
+                get: { entry.title },
+                set: { entry.title = $0; entry.lastModifiedAt = Date() }
+            ))
                 .font(.title2)
                 .textFieldStyle(.plain)
                 .focused($isTitleFocused)
@@ -34,18 +37,15 @@ struct EntryDetailView: View {
 
             Divider()
 
-            TextEditor(text: $entry.content)
+            TextEditor(text: Binding(
+                get: { entry.content },
+                set: { entry.content = $0; entry.lastModifiedAt = Date() }
+            ))
                 .font(.body)
                 .focused($isContentFocused)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
                 .background(controlBG)
-                .onChange(of: entry.content) { oldValue, newValue in
-                    entry.lastModifiedAt = Date()
-                }
-                .onChange(of: entry.title) { oldValue, newValue in
-                    entry.lastModifiedAt = Date()
-                }
 
             Divider()
 
