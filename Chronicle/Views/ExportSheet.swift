@@ -1,6 +1,6 @@
 //
 //  ExportSheet.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI

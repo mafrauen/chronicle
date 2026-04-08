@@ -1,6 +1,6 @@
 //
 //  EntryRowView.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI

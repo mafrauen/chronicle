@@ -1,6 +1,6 @@
 //
 //  TagPickerView.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI

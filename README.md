@@ -1,26 +1,26 @@
-# ToJo - The TODO Journal
+# Chronicle - your work journal
 
-Get it out of your head. ToJo is a lightweight journal for logging achievements
-and pinning your current goals — so when review time comes, you already have
-the receipts.
+Get it out of your head. Chronicle is a lightweight journal for logging
+achievements and pinning your current goals — so when review time comes, you
+already have the receipts.
 
 
 # Track your accomplishments
 
-The core of ToJo is the list of entries. Think of this like a journal; when
-something happens that you don't want to forget, this is the place to put it.
-Entries are lightweight: a title, some content, and some tags. Searchable and
-filterable when you want to find out what got done.
+The core of Chronicle is the list of entries. Think of this like a journal;
+when something happens that you don't want to forget, this is the place to put
+it. Entries are lightweight: a title, some content, and some tags. Searchable
+and filterable when you want to find out what got done.
 
 
 # Quickly see your current goals
 
-ToJo supports a single pinned entry. The idea behind this is to have a simple
-list of the things you want to get done this week. When a new week starts,
-create a new list with your next set of priorities and the old list becomes a
-normal entry that can serve as a reference for additional context at that time.
-But of course you're free to use the pinned entry however you like. ⌘-D opens a
-separate pane to show the currently pinned entry.
+Chronicle supports a single pinned entry. The idea behind this is to have a
+simple list of the things you want to get done this week. When a new week
+starts, create a new list with your next set of priorities and the old list
+becomes a normal entry that can serve as a reference for additional context at
+that time. But of course you're free to use the pinned entry however you like.
+⌘-D opens a separate pane to show the currently pinned entry.
 
 
 # Filter and export
@@ -37,18 +37,18 @@ When signed into iCloud, your entries are available across iOS and macOS.
 
 ## URL scheme support
 
-There are a few URL endpoints that ToJo supports:
+There are a few URL endpoints that Chronicle supports:
 
-- `tojo://open`: opens the app. Can use the `?pinned` query parameter to select
+- `chronicle://open`: opens the app. Can use the `?pinned` query parameter to select
   the pinned entry.
-- `tojo://new`: creates a new entry. Can be pre-filled with `?title` and
+- `chronicle://new`: creates a new entry. Can be pre-filled with `?title` and
   `?content` query parameters.
-- `tojo://entry`: opens the app and finds an entry with the given `?title`; if
+- `chronicle://entry`: opens the app and finds an entry with the given `?title`; if
   there is not one it will be created. An optional `?tag` query is available,
   the tag will be added to the new or existing entry.
 
-The "entry" endpoint can be used to have a daily/weekly scratch pad that's easy
-to find. The following AppleScript script will create/open today's scratch pad:
+The "entry" endpoint can be used to have a daily scratch pad that's easy to
+find. The following AppleScript script will create/open today's scratch pad:
 
 ```
 set today to current date
@@ -57,7 +57,7 @@ set m to text -2 thru -1 of ("0" & (month of today as integer as string))
 set d to text -2 thru -1 of ("0" & (day of today as string))
 
 set dateStr to y & "-" & m & "-" & d
-set entryURL to "tojo://entry?tag=scratch&title=Scratch " & dateStr
+set entryURL to "chronicle://entry?tag=scratch&title=Scratch " & dateStr
 
 open location entryURL
 ```

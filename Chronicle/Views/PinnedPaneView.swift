@@ -1,6 +1,6 @@
 //
 //  PinnedPaneView.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI

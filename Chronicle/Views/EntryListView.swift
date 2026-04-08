@@ -1,6 +1,6 @@
 //
 //  EntryListView.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI
@@ -87,7 +87,7 @@ struct EntryListView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         #else
-        .navigationTitle("ToJo")
+        .navigationTitle("Chronicle")
         #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -121,7 +121,7 @@ struct EntryListView: View {
             isPresented: $showExporter,
             document: exportDocument,
             contentTypes: [.json, .commaSeparatedText, .plainText],
-            defaultFilename: "ToJo Export"
+            defaultFilename: "Chronicle Export"
         ) { _ in }
     }
 

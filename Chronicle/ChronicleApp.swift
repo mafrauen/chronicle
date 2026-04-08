@@ -1,6 +1,6 @@
 //
-//  ToJoApp.swift
-//  ToJo
+//  ChronicleApp.swift
+//  Chronicle
 //
 //  Created by Michael Frauenholtz on 3/24/26.
 //
@@ -10,11 +10,11 @@ import SwiftData
 
 
 extension Notification.Name {
-    static let tojoURLReceived = Notification.Name("tojoURLReceived")
+    static let chronicleURLReceived = Notification.Name("chronicleURLReceived")
 }
 
 @main
-struct ToJoApp: App {
+struct ChronicleApp: App {
     #if os(macOS)
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
     #endif
@@ -27,7 +27,7 @@ struct ToJoApp: App {
             Tag.self,
         ])
         do {
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .private("iCloud.com.tojo.app"))
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .private("iCloud.com.frauenholtz.Chronicle"))
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
@@ -38,14 +38,14 @@ struct ToJoApp: App {
         WindowGroup {
             ContentView()
                 .environment(appModel)
-                .onReceive(NotificationCenter.default.publisher(for: .tojoURLReceived)) { notification in
+                .onReceive(NotificationCenter.default.publisher(for: .chronicleURLReceived)) { notification in
                     if let url = notification.object as? URL {
                         handleURL(url)
                     }
                 }
-                .handlesExternalEvents(preferring: ["tojo"], allowing: ["*"])
+                .handlesExternalEvents(preferring: ["chronicle"], allowing: ["*"])
         }
-        .handlesExternalEvents(matching: ["tojo"])
+        .handlesExternalEvents(matching: ["chronicle"])
         .modelContainer(sharedModelContainer)
         #if os(macOS)
         .commands {
@@ -84,13 +84,13 @@ struct ToJoApp: App {
         }
         #endif
     }
-    
+
     private func handleURL(_ url: URL) {
         #if os(macOS)
         AppDelegate.showMainWindow()
         #endif
 
-        guard url.scheme == "tojo" else { return }
+        guard url.scheme == "chronicle" else { return }
         let action = url.host(percentEncoded: false) ?? ""
 
         switch action {
@@ -124,7 +124,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             AppDelegate.showMainWindow()
-            NotificationCenter.default.post(name: .tojoURLReceived, object: url)
+            NotificationCenter.default.post(name: .chronicleURLReceived, object: url)
         }
     }
 
@@ -150,3 +150,4 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 #endif
+

@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D14C92AB2F72ED67009F9C15"
-               BuildableName = "ToJo.app"
-               BlueprintName = "ToJo"
-               ReferencedContainer = "container:ToJo.xcodeproj">
+               BuildableName = "Chronicle.app"
+               BlueprintName = "Chronicle"
+               ReferencedContainer = "container:Chronicle.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -36,9 +36,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D14C92BC2F72ED68009F9C15"
-               BuildableName = "ToJoTests.xctest"
-               BlueprintName = "ToJoTests"
-               ReferencedContainer = "container:ToJo.xcodeproj">
+               BuildableName = "ChronicleTests.xctest"
+               BlueprintName = "ChronicleTests"
+               ReferencedContainer = "container:Chronicle.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -47,9 +47,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D14C92C62F72ED68009F9C15"
-               BuildableName = "ToJoUITests.xctest"
-               BlueprintName = "ToJoUITests"
-               ReferencedContainer = "container:ToJo.xcodeproj">
+               BuildableName = "ChronicleUITests.xctest"
+               BlueprintName = "ChronicleUITests"
+               ReferencedContainer = "container:Chronicle.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -69,9 +69,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D14C92AB2F72ED67009F9C15"
-            BuildableName = "ToJo.app"
-            BlueprintName = "ToJo"
-            ReferencedContainer = "container:ToJo.xcodeproj">
+            BuildableName = "Chronicle.app"
+            BlueprintName = "Chronicle"
+            ReferencedContainer = "container:Chronicle.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -86,9 +86,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D14C92AB2F72ED67009F9C15"
-            BuildableName = "ToJo.app"
-            BlueprintName = "ToJo"
-            ReferencedContainer = "container:ToJo.xcodeproj">
+            BuildableName = "Chronicle.app"
+            BlueprintName = "Chronicle"
+            ReferencedContainer = "container:Chronicle.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

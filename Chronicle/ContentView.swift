@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  ToJo
+//  Chronicle
 //
 //  Created by Michael Frauenholtz on 3/24/26.
 //
@@ -58,7 +58,7 @@ struct ContentView: View {
         .onChange(of: appModel.newEntryTrigger) { _, _ in
             createNewEntry()
         }
-        .onChange(of: appModel.focusTagFieldTrigger) { _, _ in
+.onChange(of: appModel.focusTagFieldTrigger) { _, _ in
             appModel.shouldFocusTagField = true
         }
         .onChange(of: appModel.searchTrigger) { _, _ in

@@ -1,6 +1,6 @@
 //
 //  EntryDetailView.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI

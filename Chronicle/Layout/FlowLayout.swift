@@ -1,6 +1,6 @@
 //
 //  FlowLayout.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI

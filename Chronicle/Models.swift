@@ -1,6 +1,6 @@
 //
 //  Models.swift
-//  ToJo
+//  Chronicle
 //
 //  Created by Michael Frauenholtz on 3/24/26.
 //

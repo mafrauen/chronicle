@@ -1,6 +1,6 @@
 //
 //  TagBadge.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI

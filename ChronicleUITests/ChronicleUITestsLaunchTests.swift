@@ -1,13 +1,13 @@
 //
-//  ToJoUITestsLaunchTests.swift
-//  ToJoUITests
+//  ChronicleUITestsLaunchTests.swift
+//  ChronicleUITests
 //
 //  Created by Michael Frauenholtz on 3/24/26.
 //
 
 import XCTest
 
-final class ToJoUITestsLaunchTests: XCTestCase {
+final class ChronicleUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

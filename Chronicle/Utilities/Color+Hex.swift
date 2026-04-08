@@ -1,6 +1,6 @@
 //
 //  Color+Hex.swift
-//  ToJo
+//  Chronicle
 //
 
 import SwiftUI
