@@ -96,8 +96,8 @@ struct ContentView: View {
                 appModel.shouldFocusContent = true
             }
         }
-        .task {
-            modelContext.undoManager = undoManager
+        .onChange(of: undoManager, initial: true) { _, newValue in
+            modelContext.undoManager = newValue
         }
     }
 
