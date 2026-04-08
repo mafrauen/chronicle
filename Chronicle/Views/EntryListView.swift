@@ -47,6 +47,7 @@ struct EntryListView: View {
     @State private var excludedTags: Set<PersistentIdentifier> = []
     @State private var dateFilter: DateFilter = .all
     @State private var customStartDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+    @State private var customEndDate: Date = .now
     @State private var showFilters = false
     @State private var showExporter = false
     @State private var exportDocument: ExportDocument = ExportDocument()
@@ -82,6 +83,7 @@ struct EntryListView: View {
         .onChange(of: excludedTags) { _, _ in updateFirstFilteredEntry() }
         .onChange(of: dateFilter) { _, _ in updateFirstFilteredEntry() }
         .onChange(of: customStartDate) { _, _ in updateFirstFilteredEntry() }
+        .onChange(of: customEndDate) { _, _ in updateFirstFilteredEntry() }
         .onChange(of: appModel.exportTrigger) { _, _ in exportFilteredEntries() }
         #if os(iOS)
         .navigationTitle("")
@@ -187,7 +189,13 @@ struct EntryListView: View {
                 DatePicker(
                     "From",
                     selection: $customStartDate,
-                    in: ...Date.now,
+                    in: ...customEndDate,
+                    displayedComponents: .date
+                )
+                DatePicker(
+                    "To",
+                    selection: $customEndDate,
+                    in: customStartDate...Date.now,
                     displayedComponents: .date
                 )
             }
@@ -252,6 +260,7 @@ struct EntryListView: View {
                     excludedTags.removeAll()
                     dateFilter = .all
                     customStartDate = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
+                    customEndDate = .now
                 }
                 .font(.caption)
             }
@@ -264,6 +273,11 @@ struct EntryListView: View {
 
     private var effectiveCutoffDate: Date? {
         dateFilter == .custom ? customStartDate : dateFilter.presetDate
+    }
+
+    private var effectiveEndDate: Date? {
+        guard dateFilter == .custom else { return nil }
+        return Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: customEndDate))
     }
 
     private var isFiltering: Bool {
@@ -291,6 +305,9 @@ struct EntryListView: View {
         }
         if let cutoff = effectiveCutoffDate {
             if pinnedEntry.createdAt < cutoff { return nil }
+        }
+        if let end = effectiveEndDate {
+            if pinnedEntry.createdAt >= end { return nil }
         }
         return pinnedEntry
     }
@@ -337,6 +354,9 @@ struct EntryListView: View {
         }
         if let cutoff = effectiveCutoffDate {
             result = result.filter { $0.createdAt >= cutoff }
+        }
+        if let end = effectiveEndDate {
+            result = result.filter { $0.createdAt < end }
         }
         return result
     }
