@@ -48,8 +48,12 @@ struct TagPickerView: View {
         .presentationDetents([.medium, .large])
         .onAppear { isSearchFocused = true }
         #else
+        popoverLayout
+        #endif
+    }
+
+    private var popoverLayout: some View {
         VStack(spacing: 0) {
-            // Search field
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -81,10 +85,10 @@ struct TagPickerView: View {
             Divider()
 
             tagList
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 320, height: 350)
         .onAppear { isSearchFocused = true }
-        #endif
     }
 
     private var tagList: some View {

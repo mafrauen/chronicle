@@ -65,9 +65,15 @@ struct EntryDetailView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Browse all tags")
+                    #if os(iOS)
+                    .sheet(isPresented: $showingTagPicker) {
+                        TagPickerView(entry: entry, allTags: allTags)
+                    }
+                    #else
                     .popover(isPresented: $showingTagPicker, arrowEdge: .top) {
                         TagPickerView(entry: entry, allTags: allTags)
                     }
+                    #endif
 
                     if !entry.tagList.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
