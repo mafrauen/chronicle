@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D143824F2F914A1D00A3380C /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D143824E2F914A1D00A3380C /* CloudKit.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		D14C92BE2F72ED68009F9C15 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D143824E2F914A1D00A3380C /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.4.sdk/System/Library/Frameworks/CloudKit.framework; sourceTree = DEVELOPER_DIR; };
 		D14C92AC2F72ED67009F9C15 /* Chronicle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Chronicle.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D14C92BD2F72ED68009F9C15 /* ChronicleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ChronicleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D14C92C72F72ED68009F9C15 /* ChronicleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ChronicleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -65,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D143824F2F914A1D00A3380C /* CloudKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,12 +91,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		D143824D2F914A1D00A3380C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D143824E2F914A1D00A3380C /* CloudKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		D14C92A32F72ED67009F9C15 = {
 			isa = PBXGroup;
 			children = (
 				D14C92AE2F72ED67009F9C15 /* Chronicle */,
 				D14C92C02F72ED68009F9C15 /* ChronicleTests */,
 				D14C92CA2F72ED68009F9C15 /* ChronicleUITests */,
+				D143824D2F914A1D00A3380C /* Frameworks */,
 				D14C92AD2F72ED67009F9C15 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -184,7 +199,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2630;
-				LastUpgradeCheck = 2630;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					D14C92AB2F72ED67009F9C15 = {
 						CreatedOnToolsVersion = 26.3;
@@ -293,6 +308,7 @@
 				CODE_SIGN_ENTITLEMENTS = Chronicle/Chronicle.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = QN7M2H8TDM;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -350,6 +366,7 @@
 				CODE_SIGN_ENTITLEMENTS = Chronicle/Chronicle.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = QN7M2H8TDM;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -432,6 +449,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -454,6 +472,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -493,6 +512,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -508,6 +528,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -518,6 +539,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
@@ -543,6 +565,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
@@ -567,6 +590,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
@@ -591,6 +615,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
