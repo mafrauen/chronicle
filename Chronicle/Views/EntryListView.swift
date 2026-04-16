@@ -59,6 +59,51 @@ struct EntryListView: View {
     }
 
     private var entryList: some View {
+        filteredList
+            #if os(iOS)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            #else
+            .navigationTitle("Chronicle")
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { onNewEntry() } label: { Label("New Entry", systemImage: "plus") }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button { withAnimation { showFilters.toggle() } } label: {
+                        Label("Filters", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    }
+                    .help("Toggle filters")
+                }
+                #if os(iOS)
+                ToolbarItem(placement: .automatic) {
+                    Button { exportFilteredEntries() } label: {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(allFilteredEntries.isEmpty)
+                }
+                #endif
+            }
+            .confirmationDialog(
+                "Delete Entry",
+                isPresented: isDeletingEntry,
+                presenting: entryToDelete
+            ) { entry in
+                let label = entry.title.isEmpty ? "Untitled" : entry.title
+                Button("Delete \"\(label)\"", role: .destructive) { onDelete(entry) }
+            } message: { entry in
+                Text("Are you sure you want to delete this entry? This cannot be undone.")
+            }
+            .fileExporter(
+                isPresented: $showExporter,
+                document: exportDocument,
+                contentTypes: [.json, .commaSeparatedText, .plainText],
+                defaultFilename: "Chronicle Export"
+            ) { _ in }
+    }
+
+    private var filteredList: some View {
         List(selection: $selectedEntry) {
             if showFilters { filterSection }
             if let pinnedEntry = filteredPinnedEntry { pinnedSection(pinnedEntry) }
@@ -85,46 +130,6 @@ struct EntryListView: View {
         .onChange(of: customStartDate) { _, _ in updateFirstFilteredEntry() }
         .onChange(of: customEndDate) { _, _ in updateFirstFilteredEntry() }
         .onChange(of: appModel.exportTrigger) { _, _ in exportFilteredEntries() }
-        #if os(iOS)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        #else
-        .navigationTitle("Chronicle")
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { onNewEntry() } label: { Label("New Entry", systemImage: "plus") }
-            }
-            ToolbarItem(placement: .automatic) {
-                Button { withAnimation { showFilters.toggle() } } label: {
-                    Label("Filters", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                }
-                .help("Toggle filters")
-            }
-            #if os(iOS)
-            ToolbarItem(placement: .automatic) {
-                Button { exportFilteredEntries() } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
-                .disabled(allFilteredEntries.isEmpty)
-            }
-            #endif
-        }
-        .confirmationDialog(
-            "Delete Entry",
-            isPresented: Binding(get: { entryToDelete != nil }, set: { if !$0 { entryToDelete = nil } }),
-            presenting: entryToDelete
-        ) { entry in
-            Button("Delete \"\(entry.title.isEmpty ? "Untitled" : entry.title)\"", role: .destructive) { onDelete(entry) }
-        } message: { entry in
-            Text("Are you sure you want to delete this entry? This cannot be undone.")
-        }
-        .fileExporter(
-            isPresented: $showExporter,
-            document: exportDocument,
-            contentTypes: [.json, .commaSeparatedText, .plainText],
-            defaultFilename: "Chronicle Export"
-        ) { _ in }
     }
 
     @ViewBuilder
@@ -366,6 +371,10 @@ struct EntryListView: View {
         if let pinned = filteredPinnedEntry { result.append(pinned) }
         result.append(contentsOf: filteredUnpinnedEntries)
         return result
+    }
+
+    private var isDeletingEntry: Binding<Bool> {
+        Binding(get: { entryToDelete != nil }, set: { if !$0 { entryToDelete = nil } })
     }
 
     private func updateFirstFilteredEntry() {
