@@ -35,7 +35,7 @@ struct ChronicleApp: App {
     }()
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
                 .environment(appModel)
                 .onReceive(NotificationCenter.default.publisher(for: .chronicleURLReceived)) { notification in
@@ -81,6 +81,8 @@ struct ChronicleApp: App {
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             }
+
+            MainWindowCommands()
         }
         #endif
     }
@@ -120,6 +122,24 @@ struct ChronicleApp: App {
 }
 
 #if os(macOS)
+struct MainWindowCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(after: .windowList) {
+            Button("Show Main Window") {
+                if let window = NSApp.windows.first(where: { $0.canBecomeKey && ($0.isVisible || $0.isMiniaturized) }) {
+                    window.makeKeyAndOrderFront(nil)
+                    NSApp.activate()
+                } else {
+                    openWindow(id: "main")
+                }
+            }
+            .keyboardShortcut("0", modifiers: .command)
+        }
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
